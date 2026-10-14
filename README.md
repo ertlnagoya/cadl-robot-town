@@ -20,6 +20,7 @@ cd ~/program/cadl/robot-town-exercise
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ~/program/cadl_repo     # cadl コマンドと PyYAML が入る
+pip install anthropic                  # LLM の委員会（--proposer llm）を使うときだけ
 ```
 
 ## 1 期だけ動かす（分散モードに固定）
@@ -196,13 +197,57 @@ python -m town.period --rush 1200 2400 25 --no-quiescence
 改正ループは既定で切替つき（adaptive）で回り、切替のしきい値
 `to_central` / `to_distributed` も改正の対象になる。
 
+## LLM の委員会（--proposer llm）
+
+改正案を LLM（Claude Opus 5.5）に書かせる。LLM には、その期の観測（会社ごとの
+定時率・罰点・効用、原因別の違反）、これまでの改正履歴、憲法、現行の規則を
+渡し、改正後の規則ファイル全体を最大 3 案返させる（`town/llm_council.py`）。
+LLM が「何を変えたか」をどう申告しても信用せず、返ってきた CADL を、
+ルールベースの案と同じ関門にかける。
+
+| 関門 | 判定 | LLM の案で起こりうること |
+|---|---|---|
+| 検査 | `cadl check` / `cadl sim-ir` を通り、街を動かす値が IR にそろう | 書式の誤り、期限を「1 minute」と書くなど |
+| 憲法（文面） | 変えたのが `@amend` 行の数値だけで、1 パラメータ 1 ステップ | 改正の対象外（顧客への配達期限など）に手を出す、一度に大きく動かす |
+| 憲法（不変条件） | 改正後のシミュレーションで、各社の定時率 6 割以上など | — |
+| 改善・投票 | ルールベースの案と同じ | もっともらしい理由でも、数字が伴わない |
+
+```bash
+export ANTHROPIC_API_KEY=...                       # または `ant auth login`
+python -m town.council --proposer llm --rounds 3
+python -m town.council --proposer llm --check      # LLM を呼ばず、配線だけ確かめる
+```
+
+LLM の案は `runs/<名前>/llm-round<k>.json` に保存され、`--proposer replay` で
+LLM を呼ばずに再生できる。`examples/llm-replay/llm-round1.json` は、関門の
+働きを見せるために手で書いた見本（LLM の出力ではない）。
+
+```bash
+python -m town.council --proposer replay --replay-dir examples/llm-replay --mode DISTRIBUTED
+```
+
+```text
+  [1] block_k 3 → 2：居座りを早めに退去させる
+  block_k 3 → 2：居座りを早めに退去させる               131.0  35.2 (34.0)      985s    ○    ○    ○   ○ × ×
+  [2] 集荷の期限を 120 秒から 180 秒に延ばす
+  集荷の期限を 120 秒から 180 秒に延ばす                     -     -      -          -    ○    ×    -    -     @amend 行の数値以外を書き換えている
+  [3] hold_limit を「1 minute」と書き直す
+  hold_limit を「1 minute」と書き直す                  -     -      -          -    ×    -    -    -     IR に規則の値がそろっていません（…）
+  → 採択なし（すべての案がどこかの関門で止まった）。規則は変わらない。
+```
+
+LLM の呼び出しには、安全分類器に断られたとき推奨のモデルで続ける
+サーバー側のフォールバック（`fallbacks: "default"`）を付けている。
+断られた・上限に達した・出力を読めないときは、その期は LLM の案なしとして続ける。
+
 ## 試作の範囲と、まだないもの
 
 - 一度採択した改正は、環境が戻っても自動では戻らない（廃止の提案は、
   隣の案として次の期に評価されるだけ）。
 - 目標を `--objective violations`（配達の遅れも含む違反全体）にすると、
   暴走は起きない。遅配が違反として数えられ、目標が街の良さとずれないため。
-- 委員会はルールベース（隣の案をすべて試す）。LLM による改正案はまだない。
+- LLM の委員会は、この試作の環境（API キーなし）では実際には呼んでいない。
+  配線（`--check`）、認証情報がないときのエラー、保存した案の再生だけを確かめた。
 - Unity・実機での再生はまだない。
 - CADL 仕様の課題として見つかったもの：
   - `cadl` 0.3.8 の `sim-ir` は `sos.transitions[*].safety_invariant` を IR に
