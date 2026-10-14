@@ -65,6 +65,9 @@ def evaluate(ir: dict, seeds: list[int], period_s: int,
         "blocked_s": sum(r["blocked_s"] for r in runs) / n,
         "violations": {k: v / n for k, v in sorted(violations.items())},
         "violation_total": sum(violations.values()) / n,
+        # 道路の規則（ROAD_USE）の違反だけ：期限 release の超過と blocking_guard の退去
+        "road_violations": sum(v for k, v in violations.items()
+                               if k in ("deadline:release", "monitor:blocking_guard")) / n,
         "companies": companies,
         "runs": runs,
     }

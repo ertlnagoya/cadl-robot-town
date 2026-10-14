@@ -2,7 +2,8 @@
 
     python -m town.council                  # 1 期ぶん改正を試みる
     python -m town.council --rounds 5       # 5 期続ける
-    python -m town.council --objective violations   # 違反の少なさを目標にする
+    python -m town.council --objective violations        # 違反全体の少なさを目標にする
+    python -m town.council --objective road_violations   # 道路の規則の違反の少なさを目標にする
 
 1 期ごとに、次の 4 つの関門を順に通った改正案だけを採択する。
 
@@ -76,6 +77,8 @@ def score(m: dict, objective: str) -> float:
         return m["on_time_deliveries"]
     if objective == "violations":
         return -m["violation_total"]
+    if objective == "road_violations":
+        return -m["road_violations"]
     raise ValueError(objective)
 
 
@@ -106,7 +109,7 @@ def main() -> int:
     p.add_argument("--rules", type=Path, default=DEFAULT_RULES)
     p.add_argument("--rounds", type=int, default=1)
     p.add_argument("--objective", default=const["objective"],
-                   choices=["on_time_deliveries", "violations"])
+                   choices=["on_time_deliveries", "violations", "road_violations"])
     p.add_argument("--name", default=dt.datetime.now().strftime("%Y%m%d-%H%M%S"))
     args = p.parse_args()
 
@@ -135,9 +138,10 @@ def main() -> int:
               f"  現行 v{version}: "
               + ", ".join(f"{k}={v:g}" for k, v in params.items()) + " ===")
         print(f"  現行: 定時配達 {cur['on_time_deliveries']:.1f}  違反 {cur['violation_total']:.1f}"
+              f"（うち道路 {cur['road_violations']:.1f}）"
               f"  ふさがれた時間 {cur['blocked_s']:.0f}s  効用 "
               + " ".join(f"{c}={x['utility']:.1f}" for c, x in cur["companies"].items()))
-        print("  改正案                              定時配達  違反   検査 憲法 改善 投票(A B C)")
+        print("  改正案                              定時配達  違反 (道路) ふさがれた  検査 憲法 改善 投票(A B C)")
         best = None
         for name, old, new in candidates(params, const["amendable"]):
             unit = const["amendable"][name]["unit"]
@@ -148,7 +152,7 @@ def main() -> int:
             try:
                 cand_ir = compile_rules(path)
             except CompileError:
-                print(f"  {label:34s}      -      -    ✗")
+                print(f"  {label:34s}       -     -      -          -    ✗")
                 continue
             m = evaluate(cand_ir, seeds, period, interval)
             ok_inv, why = invariants_ok(m, const["invariants"])
@@ -158,7 +162,8 @@ def main() -> int:
             ok_vote = sum(votes.values()) >= const["vote"]["quorum"]
             v = " ".join("○" if votes[c] else "×" for c in sorted(votes))
             mark = lambda b: "○" if b else "×"
-            print(f"  {label:34s} {m['on_time_deliveries']:7.1f} {m['violation_total']:6.1f}"
+            print(f"  {label:34s} {m['on_time_deliveries']:7.1f} {m['violation_total']:5.1f}"
+                  f" ({m['road_violations']:4.1f}) {m['blocked_s']:8.0f}s"
                   f"    ○    {mark(ok_inv)}    {mark(ok_gain)}   {v}"
                   + (f"   {why}" if why else ""))
             if ok_inv and ok_gain and ok_vote and (best is None or gain > best[0]):

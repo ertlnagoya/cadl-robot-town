@@ -26,7 +26,8 @@ invariants:
   max_unfinished_orders: 2        # 期の終わりに未配達のまま残る注文（1 期あたり）
 
 # 委員会が改善とみなす量：町全体の定時配達件数。
-# `violations` にすると「違反件数の少なさ」を目標にする（グッドハートの実験用）。
+# `violations` は違反全体（配達の遅れを含む）、`road_violations` は道路の規則の
+# 違反だけの少なさを目標にする（グッドハートの実験用）。
 objective: on_time_deliveries
 min_improvement: 1.0              # これ未満の改善は採択しない（ノイズ対策）
 
