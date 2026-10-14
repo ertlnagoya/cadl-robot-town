@@ -1,0 +1,38 @@
+# 憲法：委員会（COUNCIL）の改正の範囲と、採択の条件。
+# 規則（cadl/robot_town.cadl）は改正ループが書き換えるが、このファイルは書き換えない。
+
+# 改正してよいパラメータ。CADL の `# @amend:<名前>` 行の数値だけを、
+# 1 回の改正で 1 ステップだけ動かせる。
+amendable:
+  hold_limit:        # ROAD_USE.release の deadline（道路上に止まってよい秒数）
+    unit: s
+    min: 10          # 荷の積み下ろしに 10 秒はかかる
+    max: 120
+    step: 10
+  block_k:           # blocking_guard が退去させる、後ろで待つ台数のしきい値
+    unit: ""
+    min: 1
+    max: 4
+    step: 1
+  sanction_lambda:   # 違反 1 件あたりの罰点の倍率（Minor=1, Major=3）
+    unit: ""
+    min: 0.0
+    max: 2.0
+    step: 0.5
+
+# 改正後も守られなければならない条件（同じ乱数シードの平均で判定）。
+invariants:
+  min_company_on_time_rate: 0.6   # どの会社の定時配達率も 6 割を下回らない
+  max_unfinished_orders: 2        # 期の終わりに未配達のまま残る注文（1 期あたり）
+
+# 委員会が改善とみなす量：町全体の定時配達件数。
+# `violations` にすると「違反件数の少なさ」を目標にする（グッドハートの実験用）。
+objective: on_time_deliveries
+min_improvement: 1.0              # これ未満の改善は採択しない（ノイズ対策）
+
+# 投票：各社は自社の効用（定時配達件数 − 罰点）が下がらなければ賛成する。
+vote:
+  quorum: 2                       # 3 社中 2 社の賛成で採択
+
+seeds: [1, 2, 3, 4, 5]
+period_s: 3600

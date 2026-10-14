@@ -1,0 +1,102 @@
+"""1 期（既定 1 時間）を、規則ファイル 1 つで、複数の乱数シードについて回す。
+
+    python -m town.period                         # cadl/robot_town.cadl
+    python -m town.period cadl/robot_town.cadl --seeds 1 2 3
+
+規則は必ず `cadl check` と `cadl sim-ir` を通してから使う。通らない
+規則では街を動かさない（フェイルクローズド）。
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+from collections import Counter
+from pathlib import Path
+
+import yaml
+
+from .world import Town, read_rules
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_RULES = ROOT / "cadl" / "robot_town.cadl"
+CONSTITUTION = ROOT / "constitution.yaml"
+
+
+class CompileError(Exception):
+    pass
+
+
+def compile_rules(path: Path) -> dict:
+    """cadl check → cadl sim-ir。どちらかが失敗したら CompileError。"""
+    check = subprocess.run(["cadl", "check", str(path)], capture_output=True, text=True)
+    if check.returncode != 0:
+        raise CompileError((check.stdout + check.stderr).strip())
+    ir = subprocess.run(["cadl", "sim-ir", str(path), "--format", "json"],
+                        capture_output=True, text=True)
+    if ir.returncode != 0:
+        raise CompileError((ir.stdout + ir.stderr).strip())
+    doc = json.loads(ir.stdout)
+    try:
+        read_rules(doc)                  # 街を動かすのに必要な値が IR にそろっているか
+    except (KeyError, StopIteration, TypeError, ValueError, IndexError) as e:
+        raise CompileError(f"IR に規則の値がそろっていません（{type(e).__name__}: {e}）")
+    return doc
+
+
+def evaluate(ir: dict, seeds: list[int], period_s: int) -> dict:
+    """シードごとに街を動かし、平均した指標と、シードごとの結果を返す。"""
+    runs = [Town(ir, seed, period_s).run() for seed in seeds]
+    n = len(runs)
+    companies = {}
+    for c in runs[0]["companies"]:
+        keys = runs[0]["companies"][c].keys()
+        companies[c] = {k: sum(r["companies"][c][k] for r in runs) / n for k in keys}
+    violations = Counter()
+    for r in runs:
+        violations.update(r["violations"])
+    return {
+        "on_time_deliveries": sum(r["on_time_deliveries"] for r in runs) / n,
+        "orders": sum(r["orders"] for r in runs) / n,
+        "unfinished": sum(r["unfinished"] for r in runs) / n,
+        "blocked_s": sum(r["blocked_s"] for r in runs) / n,
+        "violations": {k: v / n for k, v in sorted(violations.items())},
+        "violation_total": sum(violations.values()) / n,
+        "companies": companies,
+        "runs": runs,
+    }
+
+
+def print_report(rules_path: Path, ir: dict, m: dict) -> None:
+    r = read_rules(ir)
+    print(f"規則: {rules_path.name}  (hold_limit={r.hold_limit_s}s, "
+          f"block_k={r.block_k}, sanction_lambda={r.sanction_lambda})")
+    print(f"  定時配達 {m['on_time_deliveries']:.1f} / 注文 {m['orders']:.1f}"
+          f"  未配達 {m['unfinished']:.1f}  ふさがれた時間 {m['blocked_s']:.0f}s"
+          f"  （シード平均）")
+    print("  会社  定時率  遅配  道路で待った回数  ふさがれた秒数  罰点   効用")
+    for c, x in m["companies"].items():
+        print(f"   {c}    {x['on_time_rate']:5.2f}  {x['late']:4.1f}  {x['parks']:16.1f}"
+              f"  {x['blocked_s']:14.0f}  {x['sanction']:5.1f}  {x['utility']:5.1f}")
+    v = ", ".join(f"{k}={n:.1f}" for k, n in m["violations"].items()) or "(なし)"
+    print(f"  違反（原因別，シード平均）: {v}")
+
+
+def main() -> int:
+    const = yaml.safe_load(CONSTITUTION.read_text(encoding="utf-8"))
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("rules", nargs="?", type=Path, default=DEFAULT_RULES)
+    p.add_argument("--seeds", type=int, nargs="+", default=const["seeds"])
+    p.add_argument("--period", type=int, default=const["period_s"])
+    args = p.parse_args()
+    try:
+        ir = compile_rules(args.rules)
+    except CompileError as e:
+        print(f"[REJECT] 規則が検査を通りません。街は動かしません。\n{e}")
+        return 1
+    print_report(args.rules, ir, evaluate(ir, args.seeds, args.period))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
