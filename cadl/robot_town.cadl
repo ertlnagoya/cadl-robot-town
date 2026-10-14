@@ -105,7 +105,30 @@ sos:
           rule: "ROBOT.blocking >= 3 AND state IN [Holding, Overstay]"  # @amend:block_k
           on_match: { transition: Evicted, severity: Major }
 
+  # ── 運用モード：分散（各社が道路上で待つ）⇄ 集中（管理者が待避所を割り当てる） ──
+  # 条件は 5 分ごとに、直前 5 分の観測で判定する。
+  #   orders_in_window : 3 社の注文の合計件数
+  #   blocked_pct      : ロボットが止まっているロボットにふさがれていた時間の割合（%）
+  # 集中管理は交差点をふさがれない反面、エッジを 1 台ずつ割り当てるので、
+  # 注文が非常に多いと許可待ちが積み重なる。そのときだけ分散に戻す。
+  transitions:
+    - from: DISTRIBUTED
+      to: CENTRALIZED
+      condition: "orders_in_window < 22"      # @amend:to_central
+      protocol: SWITCH
+      safety_invariant: "robots_on_road == 0"
+    - from: CENTRALIZED
+      to: DISTRIBUTED
+      condition: "orders_in_window >= 26"     # @amend:to_distributed
+      protocol: SWITCH
+
   protocols:
+    - id: SWITCH
+      trigger: "regime_condition_holds"
+      steps:
+        - "TOWN_STEWARD -> ROBOT[*] : regime_notice"
+        - "ROBOT[*] -> TOWN_STEWARD : node_released"
+        - "TOWN_STEWARD : activate_regime"
     - id: AMEND
       trigger: "period_end"
       steps:

@@ -19,6 +19,16 @@ amendable:
     min: 0.0
     max: 2.0
     step: 0.5
+  to_central:        # 分散 → 集中に切り替える、5 分間の注文件数の上限（これ未満で集中へ）
+    unit: 件
+    min: 10
+    max: 30
+    step: 2
+  to_distributed:    # 集中 → 分散に戻す、5 分間の注文件数のしきい値（これ以上で分散へ）
+    unit: 件
+    min: 14
+    max: 40
+    step: 2
 
 # 改正後も守られなければならない条件（同じ乱数シードの平均で判定）。
 invariants:

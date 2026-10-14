@@ -110,6 +110,9 @@ def main() -> int:
     p.add_argument("--rounds", type=int, default=1)
     p.add_argument("--objective", default=const["objective"],
                    choices=["on_time_deliveries", "violations", "road_violations"])
+    p.add_argument("--mode", default="adaptive",
+                   choices=["adaptive", "DISTRIBUTED", "CENTRALIZED"],
+                   help="運用モード。adaptive は CADL の条件で切り替える。ほかは固定")
     p.add_argument("--name", default=dt.datetime.now().strftime("%Y%m%d-%H%M%S"))
     args = p.parse_args()
 
@@ -120,7 +123,7 @@ def main() -> int:
     text = args.rules.read_text(encoding="utf-8")
     version = 1
     (run_dir / f"v{version}.cadl").write_text(text, encoding="utf-8")
-    history = [f"# 改正履歴（目標: {args.objective}）\n"]
+    history = [f"# 改正履歴（目標: {args.objective}，運用モード: {args.mode}）\n"]
 
     try:
         ir = compile_rules(run_dir / f"v{version}.cadl")
@@ -132,16 +135,17 @@ def main() -> int:
         env = periods[(rnd - 1) % len(periods)]
         seeds = [s + env["seed_offset"] for s in const["seeds"]]
         interval = env["order_interval_s"]
-        cur = evaluate(ir, seeds, period, interval)
+        rush = env.get("rush")
+        cur = evaluate(ir, seeds, period, interval, args.mode, rush)
         params = read_params(text)
         print(f"\n=== 第 {rnd} 期（{env['label']}：注文の平均間隔 {interval:g} 秒）"
               f"  現行 v{version}: "
               + ", ".join(f"{k}={v:g}" for k, v in params.items()) + " ===")
         print(f"  現行: 定時配達 {cur['on_time_deliveries']:.1f}  違反 {cur['violation_total']:.1f}"
               f"（うち道路 {cur['road_violations']:.1f}）"
-              f"  ふさがれた時間 {cur['blocked_s']:.0f}s  効用 "
+              f"  ふさがれた時間 {cur['blocked_s']:.0f}s  集中 {100 * cur['central_share']:.0f}%  効用 "
               + " ".join(f"{c}={x['utility']:.1f}" for c, x in cur["companies"].items()))
-        print("  改正案                              定時配達  違反 (道路) ふさがれた  検査 憲法 改善 投票(A B C)")
+        print("  改正案                                  定時配達  違反 (道路) ふさがれた  検査 憲法 改善 投票(A B C)")
         best = None
         for name, old, new in candidates(params, const["amendable"]):
             unit = const["amendable"][name]["unit"]
@@ -152,9 +156,9 @@ def main() -> int:
             try:
                 cand_ir = compile_rules(path)
             except CompileError:
-                print(f"  {label:34s}       -     -      -          -    ✗")
+                print(f"  {label:38s}       -     -      -          -    ✗")
                 continue
-            m = evaluate(cand_ir, seeds, period, interval)
+            m = evaluate(cand_ir, seeds, period, interval, args.mode, rush)
             ok_inv, why = invariants_ok(m, const["invariants"])
             gain = score(m, args.objective) - score(cur, args.objective)
             ok_gain = gain >= const["min_improvement"]
@@ -162,7 +166,7 @@ def main() -> int:
             ok_vote = sum(votes.values()) >= const["vote"]["quorum"]
             v = " ".join("○" if votes[c] else "×" for c in sorted(votes))
             mark = lambda b: "○" if b else "×"
-            print(f"  {label:34s} {m['on_time_deliveries']:7.1f} {m['violation_total']:5.1f}"
+            print(f"  {label:38s} {m['on_time_deliveries']:7.1f} {m['violation_total']:5.1f}"
                   f" ({m['road_violations']:4.1f}) {m['blocked_s']:8.0f}s"
                   f"    ○    {mark(ok_inv)}    {mark(ok_gain)}   {v}"
                   + (f"   {why}" if why else ""))

@@ -10,6 +10,8 @@
   ロボット（積み下ろし中・道路上で待機中）がいると、誰も入れない。
 - 各社の行動方針は `town/policies.py`。A 社は協調型、B 社は期限ぎりぎり
   まで道路で待つ計算型、C 社は罰則が重くなるまで居座る強欲型。
+- 運用モードは分散（DISTRIBUTED）と集中（CENTRALIZED）の 2 つ。切り替える
+  条件は CADL の `sos.transitions` に書かれる（後述）。
 
 ## セットアップ
 
@@ -20,14 +22,15 @@ source .venv/bin/activate
 pip install -e ~/program/cadl_repo     # cadl コマンドと PyYAML が入る
 ```
 
-## 1 期だけ動かす
+## 1 期だけ動かす（分散モードに固定）
 
 ```bash
-python -m town.period
+python -m town.period --mode DISTRIBUTED
 ```
 
 ```text
 需要: 各社の注文の平均間隔 75 秒
+運用モード: DISTRIBUTED
 規則: robot_town.cadl  (hold_limit=60s, block_k=3, sanction_lambda=0.5)
   定時配達 121.8 / 注文 132.2  未配達 0.0  ふさがれた時間 2404s  （シード平均）
   会社  定時率  遅配  道路で待った回数  ふさがれた秒数  罰点   効用
@@ -35,6 +38,7 @@ python -m town.period
    B     0.94   2.6              38.0             849    0.9   38.9
    C     1.00   0.0              39.6             203   14.8   28.8
   違反（原因別，シード平均）: deadline:dropoff=2.6, deadline:pickup=7.8, deadline:release=23.0, monitor:blocking_guard=2.8
+  運用モード: 集中の時間 0%  切替 0.0 回（切替中の合計 0s，管理者による退去 0.0 台，安全条件の違反 0.0 回）
 ```
 
 C 社は交差点に居座って定時率 100% を得て、そのぶん A 社がふさがれる。
@@ -42,8 +46,8 @@ C 社は交差点に居座って定時率 100% を得て、そのぶん A 社が
 ## 改正ループを回す
 
 ```bash
-python -m town.council                 # 1 期
-python -m town.council --rounds 5      # 5 期
+python -m town.council --mode DISTRIBUTED            # 1 期
+python -m town.council --mode DISTRIBUTED --rounds 6 # 6 期
 ```
 
 改正案は `constitution.yaml` の `amendable` にあるパラメータ（CADL の
@@ -51,11 +55,11 @@ python -m town.council --rounds 5      # 5 期
 改善・投票の 4 つの関門を通った案のうち、目標が最もよくなる案を採択する。
 
 ```text
-=== 第 1 期（平常：注文の平均間隔 75 秒）  現行 v1: sanction_lambda=0.5, hold_limit=60, block_k=3 ===
-  改正案                              定時配達  違反   検査 憲法 改善 投票(A B C)
-  hold_limit 60s → 50s                 120.6   40.4    ○    ○    ×   ○ × ×
-  hold_limit 60s → 70s                 124.2   31.6    ○    ○    ○   ○ ○ ○
-  block_k 3 → 2                        131.0   35.2    ○    ○    ○   ○ × ×
+=== 第 1 期（平常：注文の平均間隔 75 秒）  現行 v1: sanction_lambda=0.5, hold_limit=60, block_k=3, to_central=22, to_distributed=26 ===
+  改正案                                  定時配達  違反 (道路) ふさがれた  検査 憲法 改善 投票(A B C)
+  hold_limit 60s → 50s                     120.6  40.4 (28.8)     2468s    ○    ○    ×   ○ × ×
+  hold_limit 60s → 70s                     124.2  31.6 (23.6)     2367s    ○    ○    ○   ○ ○ ○
+  block_k 3 → 2                            131.0  35.2 (34.0)      985s    ○    ○    ○   ○ × ×
   ...
   → 採択: hold_limit 60s → 70s（目標 +2.4，賛成 ABC）。v2.cadl として保存。
 ```
@@ -66,30 +70,31 @@ python -m town.council --rounds 5      # 5 期
 
 ## 需要の変化（scenario.yaml）
 
-第 k 期の需要は `scenario.yaml` の `periods[k-1]` で決まる（平常 → 繁忙期 →
-閑散期を 2 期ずつ）。期ごとに乱数シードも変わり、現行の規則もその期の
+第 k 期の需要は `scenario.yaml` の `periods[k-1]` で決まる。平常・繁忙期・
+閑散期があり、平常と繁忙期の 2 期目には、期の途中（20〜40 分）に注文が
+集中するラッシュがある。期ごとに乱数シードも変わり、現行の規則もその期の
 環境で評価し直してから改正案と比べる。
 
 ```bash
-python -m town.council --rounds 6
-python -m town.period --interval 45    # 繁忙期だけを 1 期動かす
+python -m town.period --interval 45                 # 繁忙期だけを 1 期
+python -m town.period --rush 1200 2400 25           # 平常＋ラッシュを 1 期
 ```
+
+分散モードに固定して 6 期回すと（`--mode DISTRIBUTED --rounds 6 --name seasons-d`）、
+次のようになる。
 
 ```text
 - 第 1 期（平常）: v2 hold_limit 60s → 70s（目標 +2.4，賛成 ABC）
-- 第 2 期（平常）: 採択なし
-- 第 3 期（繁忙期）: 採択なし
-- 第 4 期（繁忙期）: 採択なし
-- 第 5 期（閑散期）: v3 block_k 3 → 2（目標 +4.6，賛成 AB）
-- 第 6 期（閑散期）: v4 block_k 2 → 1（目標 +1.8，賛成 AB）
+- 第 2 期（平常＋ラッシュ）: v3 hold_limit 70s → 80s（目標 +1.6，賛成 ABC）
+- 第 3 期（繁忙期）: v4 hold_limit 80s → 70s（目標 +6.0，賛成 ABC）
+- 第 4 期（繁忙期＋ラッシュ）: v5 hold_limit 70s → 60s（目標 +4.0，賛成 ABC）
+- 第 5 期（閑散期）: v6 block_k 3 → 2（目標 +6.0，賛成 AB）
+- 第 6 期（閑散期）: v7 block_k 2 → 1（目標 +2.0，賛成 AB）
 ```
 
 平常期と繁忙期には B 社・C 社の反対で否決され続けた `block_k 3 → 2` が、
 閑散期に B 社が賛成に回って通る。注文が少ないと、道路で待って次の注文に
 早く着く利得より、他社に待たされる損のほうが B 社にとって大きくなるため。
-
-採択された版は `runs/<名前>/v1.cadl, v2.cadl, …` と `history.md` に残る。
-cadl-explorer の Designer で版どうしを比較できる。
 
 ## グッドハート型の暴走（目標を「道路の規則の違反の少なさ」にする）
 
@@ -98,38 +103,98 @@ cadl-explorer の Designer で版どうしを比較できる。
 流れていく。違反を減らす一番簡単な方法は、違反と数えないことだから。
 
 ```bash
-python -m town.council --rounds 8 --objective road_violations --name goodhart
+python -m town.council --mode DISTRIBUTED --rounds 8 --objective road_violations --name goodhart-d
 ```
 
 ```text
 - 第 1 期（平常）: v2 hold_limit 60s → 70s（目標 +2.2，賛成 ABC）
-- 第 2 期（平常）: v3 hold_limit 70s → 80s（目標 +1.6，賛成 AC）
-- 第 3 期（繁忙期）: v4 block_k 3 → 4（目標 +5.4，賛成 BC）
-- 第 4〜6 期: 採択なし
+- 第 4 期（繁忙期＋ラッシュ）: v3 block_k 3 → 4（目標 +4.0，賛成 ABC）
+- 第 5 期（閑散期）: v4 hold_limit 70s → 80s（目標 +1.0，賛成 ABC）
 - 第 7 期（平常）: v5 hold_limit 80s → 90s（目標 +1.4，賛成 ABC）
-- 第 8 期（平常）: v6 hold_limit 90s → 100s（目標 +1.8，賛成 BC）
+（ほかの期は採択なし）
 ```
 
 改正ループが評価に使っていないシードで、版どうしを比べる。
 
 ```bash
-python -m town.compare runs/goodhart/v1.cadl runs/goodhart/v6.cadl runs/seasons/v4.cadl
+python -m town.compare runs/goodhart-d/v1.cadl runs/goodhart-d/v5.cadl runs/seasons-d/v7.cadl --mode DISTRIBUTED
 ```
 
 ```text
-需要: 注文の平均間隔 75 秒  シード [1001, 1002, 1003, 1004, 1005]
-  規則                          hold block   λ  定時配達  遅配  道路違反  ふさがれた  A定時率  効用 A / B / C
-  runs/goodhart/v1.cadl          60     3  0.5    112.2  10.8     25.0      2457s    0.82  36.8 / 39.1 / 19.8
-  runs/goodhart/v6.cadl         100     4  0.5    107.0  16.0     18.2      3711s    0.75  34.0 / 37.0 / 25.5
-  runs/seasons/v4.cadl           70     1  0.5    123.0   0.0     27.0        52s    1.00  45.0 / 41.8 / 4.3
+需要: 注文の平均間隔 75 秒  運用モード DISTRIBUTED  シード [1001, 1002, 1003, 1004, 1005]
+  規則                          hold block   λ  定時配達  遅配  道路違反  ふさがれた  集中   A定時率  効用 A / B / C
+  runs/goodhart-d/v1.cadl        60     3  0.5    112.2  10.8     25.0      2457s    0%    0.82  36.8 / 39.1 / 19.8
+  runs/goodhart-d/v5.cadl        90     4  0.5    106.0  17.0     21.0      3681s    0%    0.72  32.8 / 37.2 / 24.1
+  runs/seasons-d/v7.cadl         60     1  0.5    123.0   0.0     28.2        52s    0%    1.00  45.0 / 41.8 / 3.7
 ```
 
-道路の規則の違反は 25.0 → 18.2 件に減ったが、ふさがれた時間は 1.5 倍、
-遅配も 1.5 倍に増え、得をしたのは居座る C 社だけだった。定時配達を目標に
-した規則（v4）は、道路の規則の違反がむしろ多いのに、遅配はゼロになる。
+道路の規則の違反は 25.0 → 21.0 件に減ったが、ふさがれた時間は 1.5 倍、
+遅配も 1.6 倍に増え、得をしたのは居座る C 社だけだった。定時配達を目標に
+した規則（v7）は、道路の規則の違反がむしろ多いのに、遅配はゼロになる。
 数えている違反の少なさと、街の良さは別物である。
 
 憲法の不変条件（各社の定時率 6 割以上）は、この程度の悪化では働かない。
+
+## 運用モードの切替（分散 ⇄ 集中）
+
+| モード | 待機の場所 | 道路の使い方 |
+|---|---|---|
+| DISTRIBUTED（分散） | 各社が道路上（中央の交差点 8）で待つ | 交差点を自由に通る |
+| CENTRALIZED（集中） | 管理者が待避所（ノード 5・2・7 の脇、各 1 台）を割り当てる。道路上での待機は禁止 | 管理者がエッジを 1 台ずつ専有で割り当てる（C-SoS と同じ）。エッジに入るたびに許可待ち 1 秒 |
+
+集中は交差点をふさがれない反面、注文が非常に多いとエッジの許可待ちが
+積み重なる。モードを固定して需要を変えると（シード 1〜5 の平均の定時配達）：
+
+| 注文の平均間隔 | 30 秒 | 45 秒 | 75 秒 | 120 秒 | 180 秒 |
+|---|---|---|---|---|---|
+| 分散 | **319.6** | 210.2 | 121.8 | 76.8 | 51.2 |
+| 集中 | 309.2 | **217.4** | **132.2** | **83.2** | **58.6** |
+
+切り替える条件は CADL に書く。5 分ごとに、直前 5 分の観測で判定する。
+
+```yaml
+  transitions:
+    - from: DISTRIBUTED
+      to: CENTRALIZED
+      condition: "orders_in_window < 22"      # @amend:to_central
+      protocol: SWITCH
+      safety_invariant: "robots_on_road == 0"
+    - from: CENTRALIZED
+      to: DISTRIBUTED
+      condition: "orders_in_window >= 26"     # @amend:to_distributed
+      protocol: SWITCH
+```
+
+分散 → 集中の切替では、道路上で待っているロボットが全員いなくなるまで
+新しいモードを有効にしない（切替中）。C 社は罰則が軽いうちは 30 秒渋る。
+60 秒たっても残っていれば管理者が退去させる。有効にした時点で
+`safety_invariant` を判定する。
+
+ラッシュのある期を、改正ループが使っていないシードで比べる。
+
+```bash
+python -m town.compare cadl/robot_town.cadl --rush 1200 2400 25 --mode DISTRIBUTED
+python -m town.compare cadl/robot_town.cadl --rush 1200 2400 25 --mode CENTRALIZED
+python -m town.compare cadl/robot_town.cadl --rush 1200 2400 25 --mode adaptive
+```
+
+| モード | 定時配達 | 遅配 | ふさがれた時間 | 集中の時間 |
+|---|---|---|---|---|
+| 分散に固定 | 202.8 | 8.0 | 2141s | 0% |
+| 集中に固定 | 206.2 | 4.6 | 843s | 100% |
+| 条件で切替（adaptive） | **209.2** | **1.6** | 1116s | 60% |
+
+切替は 1 期に 3 回（開始 5 分で集中へ、ラッシュで分散へ、ラッシュ後に集中へ）。
+
+道路上の待機が残っていても切替をすぐ有効にすると（`--no-quiescence`）、
+安全条件 `robots_on_road == 0` の違反が 1 期あたり平均 1.6 回記録される。
+
+```bash
+python -m town.period --rush 1200 2400 25 --no-quiescence
+```
+
+改正ループは既定で切替つき（adaptive）で回り、切替のしきい値
+`to_central` / `to_distributed` も改正の対象になる。
 
 ## 試作の範囲と、まだないもの
 
@@ -138,6 +203,13 @@ python -m town.compare runs/goodhart/v1.cadl runs/goodhart/v6.cadl runs/seasons/
 - 目標を `--objective violations`（配達の遅れも含む違反全体）にすると、
   暴走は起きない。遅配が違反として数えられ、目標が街の良さとずれないため。
 - 委員会はルールベース（隣の案をすべて試す）。LLM による改正案はまだない。
-- 運用モード（分散 ⇄ 集中）の切替、Unity・実機での再生はまだない。
+- Unity・実機での再生はまだない。
+- CADL 仕様の課題として見つかったもの：
+  - `cadl` 0.3.8 の `sim-ir` は `sos.transitions[*].safety_invariant` を IR に
+    出力しない。`town/period.py` は検査を通ったソースから読んで添えている。
+  - 運用モードに規則のパラメータ値を結びつける構文がない。集中モードで何が
+    変わるか（待避所、エッジの専有）は、シミュレータ側（`town/world.py`）が決めている。
+  - `deadline: soon` のような誤った期限も `cadl check` を通り、IR では `null`
+    になる。`town/period.py` は IR に値がそろわない規則を却下している。
 - `town/contract_engine.py` は raspimouse-swarm-simulator の
   `cadl/runtime/engine.py`（commit 848541f）の複製。

@@ -37,6 +37,14 @@ def wants_to_park(company: str, rules: Rules) -> bool:
     raise ValueError(company)
 
 
+def switch_delay_s(company: str, rules: Rules) -> int:
+    """集中管理への切替が告げられてから、道路上の待機をやめるまでの秒数。
+    C 社は罰則が軽いうちは渋る。"""
+    if company == "C" and rules.sanction_lambda < 1.5:
+        return 30
+    return 0
+
+
 def max_park_s(company: str, rules: Rules) -> int | None:
     """道路上で待つ最長の秒数。None なら注文が来るか退去させられるまで待つ。"""
     if company == "B" or (company == "C" and rules.sanction_lambda >= 1.5):

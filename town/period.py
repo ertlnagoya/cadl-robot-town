@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from .world import ORDER_MEAN_INTERVAL_S, Town, read_rules
+from .world import ORDER_MEAN_INTERVAL_S, Town, read_regimes, read_rules
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RULES = ROOT / "cadl" / "robot_town.cadl"
@@ -41,15 +41,28 @@ def compile_rules(path: Path) -> dict:
     doc = json.loads(ir.stdout)
     try:
         read_rules(doc)                  # 街を動かすのに必要な値が IR にそろっているか
+        read_regimes(doc)
     except (KeyError, StopIteration, TypeError, ValueError, IndexError) as e:
         raise CompileError(f"IR に規則の値がそろっていません（{type(e).__name__}: {e}）")
+    # cadl 0.3.8 の sim-ir は sos.transitions[*].safety_invariant を IR に出力しない
+    # （cadl check は式として検査する）。切替の安全条件を判定するため、検査を通った
+    # ソースから読んで添える。
+    src = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    doc["x_safety_invariants"] = {
+        f"{tr['from']}->{tr['to']}": tr["safety_invariant"]
+        for tr in (src.get("sos", {}).get("transitions") or [])
+        if tr.get("safety_invariant")
+    }
     return doc
 
 
 def evaluate(ir: dict, seeds: list[int], period_s: int,
-             order_interval_s: float = ORDER_MEAN_INTERVAL_S) -> dict:
+             order_interval_s: float = ORDER_MEAN_INTERVAL_S,
+             mode: str = "adaptive", rush: dict | None = None,
+             quiescence: bool = True) -> dict:
     """シードごとに街を動かし、平均した指標と、シードごとの結果を返す。"""
-    runs = [Town(ir, seed, period_s, order_interval_s).run() for seed in seeds]
+    runs = [Town(ir, seed, period_s, order_interval_s, mode, rush, quiescence).run()
+            for seed in seeds]
     n = len(runs)
     companies = {}
     for c in runs[0]["companies"]:
@@ -58,7 +71,13 @@ def evaluate(ir: dict, seeds: list[int], period_s: int,
     violations = Counter()
     for r in runs:
         violations.update(r["violations"])
+    avg = lambda k: sum(r[k] for r in runs) / n
     return {
+        "central_share": avg("central_share"),
+        "switches": avg("switches"),
+        "switch_s": avg("switch_s"),
+        "forced_evictions": avg("forced_evictions"),
+        "invariant_breaches": avg("invariant_breaches"),
         "on_time_deliveries": sum(r["on_time_deliveries"] for r in runs) / n,
         "orders": sum(r["orders"] for r in runs) / n,
         "unfinished": sum(r["unfinished"] for r in runs) / n,
@@ -86,6 +105,9 @@ def print_report(rules_path: Path, ir: dict, m: dict) -> None:
               f"  {x['blocked_s']:14.0f}  {x['sanction']:5.1f}  {x['utility']:5.1f}")
     v = ", ".join(f"{k}={n:.1f}" for k, n in m["violations"].items()) or "(なし)"
     print(f"  違反（原因別，シード平均）: {v}")
+    print(f"  運用モード: 集中の時間 {100 * m['central_share']:.0f}%  切替 {m['switches']:.1f} 回"
+          f"（切替中の合計 {m['switch_s']:.0f}s，管理者による退去 {m['forced_evictions']:.1f} 台，"
+          f"安全条件の違反 {m['invariant_breaches']:.1f} 回）")
 
 
 def main() -> int:
@@ -96,6 +118,13 @@ def main() -> int:
     p.add_argument("--period", type=int, default=const["period_s"])
     p.add_argument("--interval", type=float, default=ORDER_MEAN_INTERVAL_S,
                    help="各社の注文の平均間隔（秒）")
+    p.add_argument("--rush", type=float, nargs=3, metavar=("FROM_S", "TO_S", "INTERVAL"),
+                   help="期の途中のラッシュ（開始秒・終了秒・その間の注文の平均間隔）")
+    p.add_argument("--no-quiescence", action="store_true",
+                   help="道路上の待機が残っていても集中管理への切替をすぐ有効にする")
+    p.add_argument("--mode", default="adaptive",
+                   choices=["adaptive", "DISTRIBUTED", "CENTRALIZED"],
+                   help="adaptive は CADL の条件で切り替える。ほかは固定")
     args = p.parse_args()
     try:
         ir = compile_rules(args.rules)
@@ -103,7 +132,14 @@ def main() -> int:
         print(f"[REJECT] 規則が検査を通りません。街は動かしません。\n{e}")
         return 1
     print(f"需要: 各社の注文の平均間隔 {args.interval:g} 秒")
-    print_report(args.rules, ir, evaluate(ir, args.seeds, args.period, args.interval))
+    rush = None
+    if args.rush:
+        rush = dict(zip(("from_s", "to_s", "order_interval_s"), args.rush))
+        print(f"ラッシュ: {rush['from_s']:g}〜{rush['to_s']:g} 秒は注文の平均間隔 {rush['order_interval_s']:g} 秒")
+    print(f"運用モード: {args.mode}")
+    print_report(args.rules, ir,
+                 evaluate(ir, args.seeds, args.period, args.interval, args.mode, rush,
+                          not args.no_quiescence))
     return 0
 
 
