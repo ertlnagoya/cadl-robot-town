@@ -2,6 +2,7 @@
 
     python -m town.period                         # cadl/robot_town.cadl
     python -m town.period cadl/robot_town.cadl --seeds 1 2 3
+    python -m town.period --interval 45          # 繁忙期（注文の平均間隔 45 秒）
 
 規則は必ず `cadl check` と `cadl sim-ir` を通してから使う。通らない
 規則では街を動かさない（フェイルクローズド）。
@@ -16,11 +17,12 @@ from pathlib import Path
 
 import yaml
 
-from .world import Town, read_rules
+from .world import ORDER_MEAN_INTERVAL_S, Town, read_rules
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RULES = ROOT / "cadl" / "robot_town.cadl"
 CONSTITUTION = ROOT / "constitution.yaml"
+SCENARIO = ROOT / "scenario.yaml"
 
 
 class CompileError(Exception):
@@ -44,9 +46,10 @@ def compile_rules(path: Path) -> dict:
     return doc
 
 
-def evaluate(ir: dict, seeds: list[int], period_s: int) -> dict:
+def evaluate(ir: dict, seeds: list[int], period_s: int,
+             order_interval_s: float = ORDER_MEAN_INTERVAL_S) -> dict:
     """シードごとに街を動かし、平均した指標と、シードごとの結果を返す。"""
-    runs = [Town(ir, seed, period_s).run() for seed in seeds]
+    runs = [Town(ir, seed, period_s, order_interval_s).run() for seed in seeds]
     n = len(runs)
     companies = {}
     for c in runs[0]["companies"]:
@@ -88,13 +91,16 @@ def main() -> int:
     p.add_argument("rules", nargs="?", type=Path, default=DEFAULT_RULES)
     p.add_argument("--seeds", type=int, nargs="+", default=const["seeds"])
     p.add_argument("--period", type=int, default=const["period_s"])
+    p.add_argument("--interval", type=float, default=ORDER_MEAN_INTERVAL_S,
+                   help="各社の注文の平均間隔（秒）")
     args = p.parse_args()
     try:
         ir = compile_rules(args.rules)
     except CompileError as e:
         print(f"[REJECT] 規則が検査を通りません。街は動かしません。\n{e}")
         return 1
-    print_report(args.rules, ir, evaluate(ir, args.seeds, args.period))
+    print(f"需要: 各社の注文の平均間隔 {args.interval:g} 秒")
+    print_report(args.rules, ir, evaluate(ir, args.seeds, args.period, args.interval))
     return 0
 
 

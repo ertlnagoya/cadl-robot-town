@@ -14,6 +14,9 @@
 改正案は、constitution.yaml の amendable に挙げたパラメータを 1 つだけ
 1 ステップ動かしたもの（現行の規則の「隣」）をすべて試す。比較は同じ
 乱数シードで行う。採択された規則は runs/<名前>/ に版として残る。
+
+第 k 期の環境（需要）は scenario.yaml の periods[k-1] で決まる。現行の
+規則も、その期の環境で評価し直してから改正案と比べる。
 """
 from __future__ import annotations
 
@@ -25,7 +28,8 @@ from pathlib import Path
 
 import yaml
 
-from .period import CONSTITUTION, DEFAULT_RULES, ROOT, CompileError, compile_rules, evaluate
+from .period import (CONSTITUTION, DEFAULT_RULES, ROOT, SCENARIO, CompileError,
+                     compile_rules, evaluate)
 
 TAG = re.compile(r"#\s*@amend:(\w+)")
 NUM = re.compile(r"\d+(?:\.\d+)?")
@@ -106,24 +110,29 @@ def main() -> int:
     p.add_argument("--name", default=dt.datetime.now().strftime("%Y%m%d-%H%M%S"))
     args = p.parse_args()
 
-    seeds, period = const["seeds"], const["period_s"]
+    periods = yaml.safe_load(SCENARIO.read_text(encoding="utf-8"))["periods"]
+    period = const["period_s"]
     run_dir = ROOT / "runs" / args.name
     run_dir.mkdir(parents=True, exist_ok=True)
     text = args.rules.read_text(encoding="utf-8")
     version = 1
     (run_dir / f"v{version}.cadl").write_text(text, encoding="utf-8")
-    history = [f"# 改正履歴（目標: {args.objective}，シード {seeds}）\n"]
+    history = [f"# 改正履歴（目標: {args.objective}）\n"]
 
     try:
         ir = compile_rules(run_dir / f"v{version}.cadl")
     except CompileError as e:
         print(f"[REJECT] 現行の規則が検査を通りません。\n{e}")
         return 1
-    cur = evaluate(ir, seeds, period)
 
     for rnd in range(1, args.rounds + 1):
+        env = periods[(rnd - 1) % len(periods)]
+        seeds = [s + env["seed_offset"] for s in const["seeds"]]
+        interval = env["order_interval_s"]
+        cur = evaluate(ir, seeds, period, interval)
         params = read_params(text)
-        print(f"\n=== 第 {rnd} 期  現行 v{version}: "
+        print(f"\n=== 第 {rnd} 期（{env['label']}：注文の平均間隔 {interval:g} 秒）"
+              f"  現行 v{version}: "
               + ", ".join(f"{k}={v:g}" for k, v in params.items()) + " ===")
         print(f"  現行: 定時配達 {cur['on_time_deliveries']:.1f}  違反 {cur['violation_total']:.1f}"
               f"  ふさがれた時間 {cur['blocked_s']:.0f}s  効用 "
@@ -141,7 +150,7 @@ def main() -> int:
             except CompileError:
                 print(f"  {label:34s}      -      -    ✗")
                 continue
-            m = evaluate(cand_ir, seeds, period)
+            m = evaluate(cand_ir, seeds, period, interval)
             ok_inv, why = invariants_ok(m, const["invariants"])
             gain = score(m, args.objective) - score(cur, args.objective)
             ok_gain = gain >= const["min_improvement"]
@@ -157,7 +166,7 @@ def main() -> int:
 
         if best is None:
             print("  → 採択なし（すべての案がどこかの関門で止まった）。規則は変わらない。")
-            history.append(f"- 第 {rnd} 期: 採択なし\n")
+            history.append(f"- 第 {rnd} 期（{env['label']}）: 採択なし\n")
             continue
         gain, name, old, new, text, ir, cur, votes = best
         version += 1
@@ -165,7 +174,8 @@ def main() -> int:
         label = fmt(name, old, new, const["amendable"][name]["unit"])
         yes = "".join(c for c in sorted(votes) if votes[c])
         print(f"  → 採択: {label}（目標 {gain:+.1f}，賛成 {yes}）。v{version}.cadl として保存。")
-        history.append(f"- 第 {rnd} 期: v{version} {label}（目標 {gain:+.1f}，賛成 {yes}）\n")
+        history.append(f"- 第 {rnd} 期（{env['label']}）: v{version} {label}"
+                       f"（目標 {gain:+.1f}，賛成 {yes}）\n")
 
     for f in run_dir.glob("round*.cadl"):          # 不採択の案は消し、版だけを残す
         f.unlink()

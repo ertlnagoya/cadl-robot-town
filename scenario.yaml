@@ -1,0 +1,14 @@
+# 環境のシナリオ：期ごとの需要。改正ループは第 k 期に periods[k-1] の環境で
+# 現行の規則と改正案を比べる（期の数より多く回すと先頭に戻る）。
+# 規則（cadl/）でも憲法（constitution.yaml）でもなく、街の外から来る条件。
+#
+# order_interval_s: 各社の注文の平均間隔（秒）。小さいほど忙しい。
+# seed_offset: この期の乱数シードは constitution.yaml の seeds にこれを足したもの。
+#              期ごとに注文の並びが変わる。同じ期の中では全案を同じシードで比べる。
+periods:
+  - {label: 平常,   order_interval_s: 75,  seed_offset: 0}
+  - {label: 平常,   order_interval_s: 75,  seed_offset: 100}
+  - {label: 繁忙期, order_interval_s: 45,  seed_offset: 200}
+  - {label: 繁忙期, order_interval_s: 45,  seed_offset: 300}
+  - {label: 閑散期, order_interval_s: 120, seed_offset: 400}
+  - {label: 閑散期, order_interval_s: 120, seed_offset: 500}

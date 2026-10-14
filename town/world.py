@@ -31,7 +31,7 @@ SECONDS_PER_UNIT = 4          # 長さ 1.0 のエッジを 4 秒で走る
 HUB = 8                       # 道路上で待つなら、ここが一番便利
 GARAGE = {"A": 10, "B": 9, "C": 4}
 ROBOTS_PER_COMPANY = 2
-ORDER_MEAN_INTERVAL_S = 75    # 各社の注文の平均間隔
+ORDER_MEAN_INTERVAL_S = 75    # 各社の注文の平均間隔（既定。scenario.yaml で期ごとに変わる）
 DWELL_S = 3                   # 積み下ろしにかかる秒数
 REPLAN_AFTER_S = 6            # これだけ待たされたら迂回路を探す
 
@@ -125,8 +125,10 @@ class Robot:
 
 
 class Town:
-    def __init__(self, ir: dict, seed: int, period_s: int) -> None:
+    def __init__(self, ir: dict, seed: int, period_s: int,
+                 order_interval_s: float = ORDER_MEAN_INTERVAL_S) -> None:
         self.ir = ir
+        self.order_interval_s = order_interval_s
         self.rules = read_rules(ir)
         self.rng = random.Random(seed)
         self.period_s = period_s
@@ -154,7 +156,7 @@ class Town:
         for c in GARAGE:
             t, n = 0.0, 0
             while True:
-                t += self.rng.expovariate(1 / ORDER_MEAN_INTERVAL_S)
+                t += self.rng.expovariate(1 / self.order_interval_s)
                 if t >= self.period_s - 300:   # 最後の 5 分は受け付けない
                     break
                 n += 1
