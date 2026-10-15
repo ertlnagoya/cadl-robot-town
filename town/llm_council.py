@@ -117,7 +117,10 @@ def propose_llm(request: dict) -> tuple[list[dict], str, str]:
             msg = stream.get_final_message()
     except anthropic.AuthenticationError:
         raise SystemExit("[ERROR] Claude API の認証に失敗しました。ANTHROPIC_API_KEY を確認してください。")
-    except TypeError as e:   # SDK は認証情報が見つからないとき TypeError を送出する
+    except TypeError as e:
+        # SDK は認証情報が見つからないとき TypeError を送出する（専用の例外クラスがない）
+        if "authentication" not in str(e).lower():
+            raise
         raise SystemExit("[ERROR] Claude API の認証情報が見つかりません。ANTHROPIC_API_KEY を設定するか、"
                          f"`ant auth login` を実行してください。（{e}）")
     except anthropic.RateLimitError:

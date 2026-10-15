@@ -44,7 +44,7 @@ def compile_rules(path: Path) -> dict:
         read_regimes(doc)
     except (KeyError, StopIteration, TypeError, ValueError, IndexError) as e:
         raise CompileError(f"IR に規則の値がそろっていません（{type(e).__name__}: {e}）")
-    # cadl 0.3.8 の sim-ir は sos.transitions[*].safety_invariant を IR に出力しない
+    # cadl 0.3.13 の sim-ir も sos.transitions[*].safety_invariant を IR に出力しない
     # （cadl check は式として検査する）。切替の安全条件を判定するため、検査を通った
     # ソースから読んで添える。
     src = yaml.safe_load(Path(path).read_text(encoding="utf-8"))

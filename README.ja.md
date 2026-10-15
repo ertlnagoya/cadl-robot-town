@@ -28,6 +28,7 @@ git clone https://github.com/ertlnagoya/cadl-robot-town
 cd cadl-robot-town
 python3 -m venv .venv
 source .venv/bin/activate
+python3 -m pip install --upgrade pip   # macOS の python3（3.9）の pip は古く、次の行が失敗する
 pip install -e ~/program/cadl_repo     # cadl コマンドと PyYAML が入る
 pip install anthropic                  # LLM の委員会（--proposer llm）を使うときだけ
 ```
@@ -293,12 +294,13 @@ LLM の呼び出しには、安全分類器に断られたとき推奨のモデ�
   断定する。観測からはそこまで言えない）は、関門では検査していない。
 - Unity・実機での再生はまだない。
 - CADL 仕様の課題として見つかったもの：
-  - `cadl` 0.3.8 の `sim-ir` は `sos.transitions[*].safety_invariant` を IR に
+  - `cadl` 0.3.13 の `sim-ir` も `sos.transitions[*].safety_invariant` を IR に
     出力しない。`town/period.py` は検査を通ったソースから読んで添えている。
   - 運用モードに規則のパラメータ値を結びつける構文がない。集中モードで何が
     変わるか（待避所、エッジの専有）は、シミュレータ側（`town/world.py`）が決めている。
-  - `deadline: soon` のような誤った期限も `cadl check` を通り、IR では `null`
-    になる。`town/period.py` は IR に値がそろわない規則を却下している。
+  - `cadl` 0.3.11 までは、`deadline: soon` のような誤った期限も `cadl check` を通り、
+    IR では `null` になっていた（0.3.12 からはエラー）。`town/period.py` は、古い
+    コンパイラでも、IR に値がそろわない規則を却下する。
 - `town/contract_engine.py` は cadl-raspimouse-simulator の
   `cadl/runtime/engine.py`（commit 3fdf7d3）の複製。
 

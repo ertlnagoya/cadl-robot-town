@@ -41,6 +41,7 @@ git clone https://github.com/ertlnagoya/cadl-robot-town
 cd cadl-robot-town
 python3 -m venv .venv
 source .venv/bin/activate
+python3 -m pip install --upgrade pip   # the pip of macOS python3 (3.9) is too old for the next line
 pip install -e ~/program/cadl_repo     # the cadl command and PyYAML
 pip install anthropic                  # only for --proposer llm
 ```
