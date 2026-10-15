@@ -111,7 +111,7 @@ def propose_llm(request: dict) -> tuple[list[dict], str]:
     except anthropic.RateLimitError:
         return [], "API の利用上限に達したため、この期は LLM の案なし"
     except anthropic.APIStatusError as e:
-        return [], f"API エラー {e.status_code} のため、この期は LLM の案なし"
+        return [], f"API エラー {e.status_code}（{e.message[:300]}）のため、この期は LLM の案なし"
     except anthropic.APIConnectionError:
         return [], "API に接続できないため、この期は LLM の案なし"
     if msg.stop_reason == "refusal":
