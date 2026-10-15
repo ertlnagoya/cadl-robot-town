@@ -197,7 +197,7 @@ python -m town.compare cadl/robot_town.cadl --rush 1200 2400 25 --mode adaptive
 切替は 1 期に 3 回（開始 5 分で集中へ、ラッシュで分散へ、ラッシュ後に集中へ）。
 
 道路上の待機が残っていても切替をすぐ有効にすると（`--no-quiescence`）、
-安全条件 `robots_on_road == 0` の違反が 1 期あたり平均 1.6 回記録される。
+安全条件 `robots_on_road == 0` の違反が 1 期あたり平均 1.4 回記録される。
 
 ```bash
 python -m town.period --rush 1200 2400 25 --no-quiescence
