@@ -18,6 +18,7 @@ MAX_PROPOSALS = 3
 SCHEMA = {
     "type": "object",
     "properties": {
+        "assessment": {"type": "string"},
         "proposals": {
             "type": "array",
             "items": {
@@ -32,7 +33,7 @@ SCHEMA = {
             },
         },
     },
-    "required": ["proposals"],
+    "required": ["assessment", "proposals"],
     "additionalProperties": False,
 }
 
@@ -51,7 +52,8 @@ SYSTEM = f"""\
 4. 投票：各社は自社の効用（定時配達件数 − 罰点）が下がらなければ賛成し、
    定足数の賛成で採択されます
 
-改正案を最大 {MAX_PROPOSALS} 件出してください。各案の cadl には、改正後の規則
+まず assessment に、この期の観測から読み取れる問題（または問題がないこと）を
+日本語で 2〜3 文で書いてください。そのうえで、改正案を最大 {MAX_PROPOSALS} 件出してください。各案の cadl には、改正後の規則
 ファイル全体を書きます。rationale には、観測のどこから何を狙ったのかと、
 各社の投票の見込みを日本語で 2〜4 文で書きます。改正すべき点がなければ、
 proposals を空にしてください。"""
@@ -95,8 +97,8 @@ def build_request(rules_text: str, constitution_text: str, env: dict, cur: dict,
     }
 
 
-def propose_llm(request: dict) -> tuple[list[dict], str]:
-    """LLM に改正案を出させる。戻り値は（提案のリスト, 状況の説明）。"""
+def propose_llm(request: dict) -> tuple[list[dict], str, str]:
+    """LLM に改正案を出させる。戻り値は（提案のリスト, 状況の説明, LLM の見立て）。"""
     import anthropic
 
     client = anthropic.Anthropic()
@@ -109,31 +111,34 @@ def propose_llm(request: dict) -> tuple[list[dict], str]:
         raise SystemExit("[ERROR] Claude API の認証情報が見つかりません。ANTHROPIC_API_KEY を設定するか、"
                          f"`ant auth login` を実行してください。（{e}）")
     except anthropic.RateLimitError:
-        return [], "API の利用上限に達したため、この期は LLM の案なし"
+        return [], "API の利用上限に達したため、この期は LLM の案なし", ""
     except anthropic.APIStatusError as e:
-        return [], f"API エラー {e.status_code}（{e.message[:300]}）のため、この期は LLM の案なし"
+        return [], f"API エラー {e.status_code}（{e.message[:300]}）のため、この期は LLM の案なし", ""
     except anthropic.APIConnectionError:
-        return [], "API に接続できないため、この期は LLM の案なし"
+        return [], "API に接続できないため、この期は LLM の案なし", ""
     if msg.stop_reason == "refusal":
-        return [], "LLM が応答を断ったため、この期は LLM の案なし"
+        return [], "LLM が応答を断ったため、この期は LLM の案なし", ""
     if msg.stop_reason == "max_tokens":
-        return [], "出力が上限で途切れたため、この期は LLM の案なし"
+        return [], "出力が上限で途切れたため、この期は LLM の案なし", ""
     text = next((b.text for b in msg.content if b.type == "text"), "")
     try:
-        proposals = json.loads(text)["proposals"][:MAX_PROPOSALS]
+        data = json.loads(text)
+        proposals = data["proposals"][:MAX_PROPOSALS]
     except (json.JSONDecodeError, KeyError, TypeError):
-        return [], "LLM の出力を JSON として読めないため、この期は LLM の案なし"
+        return [], "LLM の出力を JSON として読めないため、この期は LLM の案なし", ""
     u = msg.usage
-    return proposals, f"{msg.model}、入力 {u.input_tokens} / 出力 {u.output_tokens} トークン"
+    return (proposals, f"{msg.model}、入力 {u.input_tokens} / 出力 {u.output_tokens} トークン",
+            data.get("assessment", ""))
 
 
-def save(path: Path, proposals: list[dict], note: str) -> None:
-    path.write_text(json.dumps({"note": note, "proposals": proposals}, ensure_ascii=False, indent=2),
-                    encoding="utf-8")
+def save(path: Path, proposals: list[dict], note: str, assessment: str) -> None:
+    path.write_text(json.dumps({"note": note, "assessment": assessment, "proposals": proposals},
+                               ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def replay(path: Path) -> tuple[list[dict], str]:
+def replay(path: Path) -> tuple[list[dict], str, str]:
     if not path.exists():
-        return [], f"{path} がないため、この期は案なし"
+        return [], f"{path} がないため、この期は案なし", ""
     data = json.loads(path.read_text(encoding="utf-8"))
-    return data["proposals"][:MAX_PROPOSALS], f"再生: {path}（{data.get('note', '')}）"
+    return (data["proposals"][:MAX_PROPOSALS], f"再生: {path}（{data.get('note', '')}）",
+            data.get("assessment", ""))

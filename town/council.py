@@ -210,11 +210,13 @@ def main() -> int:
                     print(f"  [check] {req['model']} に送る依頼: system {len(req['system'])} 字、"
                           f"user {len(req['messages'][0]['content'])} 字。LLM は呼ばずに終わります。")
                     return 0
-                proposals, note = llm_council.propose_llm(req)
-                llm_council.save(run_dir / f"llm-round{rnd}.json", proposals, note)
+                proposals, note, view = llm_council.propose_llm(req)
+                llm_council.save(run_dir / f"llm-round{rnd}.json", proposals, note, view)
             else:
-                proposals, note = llm_council.replay(args.replay_dir / f"llm-round{rnd}.json")
+                proposals, note, view = llm_council.replay(args.replay_dir / f"llm-round{rnd}.json")
             print(f"  LLM の委員会: {note}、{len(proposals)} 件")
+            if view:
+                print(f"  見立て: {view}")
         print("  改正案                                  定時配達  違反 (道路) ふさがれた  検査 憲法 改善 投票(A B C)")
         best = None
         for i, prop in enumerate(proposals, 1):
