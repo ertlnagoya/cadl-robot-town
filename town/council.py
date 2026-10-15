@@ -205,7 +205,8 @@ def main() -> int:
             proposals = neighbor_proposals(text, const["amendable"])
         else:
             if args.proposer == "llm":
-                req = llm_council.build_request(text, const_text, env, cur, history, args.objective)
+                req = llm_council.build_request(text, const_text, env, cur, history, args.objective,
+                                                args.mode)
                 if args.check:
                     print(f"  [check] {req['model']} に送る依頼: system {len(req['system'])} 字、"
                           f"user {len(req['messages'][0]['content'])} 字。LLM は呼ばずに終わります。")

@@ -74,10 +74,20 @@ def _observation(cur: dict) -> str:
     return "\n".join(lines)
 
 
+MODE_NOTE = {
+    "adaptive": "規則の sos.transitions の条件に従って、分散と集中を切り替えている。",
+    "DISTRIBUTED": "実験のため分散（DISTRIBUTED）に固定している。sos.transitions の条件は使われず、"
+                   "集中モードには切り替わらない。",
+    "CENTRALIZED": "実験のため集中（CENTRALIZED）に固定している。sos.transitions の条件は使われず、"
+                   "分散モードには切り替わらない。",
+}
+
+
 def build_request(rules_text: str, constitution_text: str, env: dict, cur: dict,
-                  history: list[str], objective: str) -> dict:
+                  history: list[str], objective: str, mode: str = "adaptive") -> dict:
     user = (
         f"## 委員会の目標\n{objective}\n\n"
+        f"## 運用モードの設定\n{MODE_NOTE[mode]}\n\n"
         f"## この期の環境\n{env['label']}（注文の平均間隔 {env['order_interval_s']} 秒"
         + (f"、ラッシュ {env['rush']}" if env.get("rush") else "") + "）\n\n"
         f"## この期の観測（現行の規則、シード平均）\n{_observation(cur)}\n\n"
