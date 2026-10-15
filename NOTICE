@@ -1,0 +1,7 @@
+CADL Robot Town
+Copyright 2026 ERTL, Graduate School of Informatics, Nagoya University
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+town/contract_engine.py is copied from cadl-raspimouse-simulator
+(https://github.com/ertlnagoya/cadl-raspimouse-simulator), Apache License 2.0.

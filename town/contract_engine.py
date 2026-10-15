@@ -1,11 +1,11 @@
-# Vendored from raspimouse-swarm-simulator cadl/runtime/engine.py
-# (commit 848541f, 2026-04-28), the same Python reference runtime that
+# Vendored from cadl-raspimouse-simulator cadl/runtime/engine.py
+# (commit 3fdf7d3, 2026-10-10), the same Python reference runtime that
 # Course A uses. Copied rather than imported because that repository's
 # top-level `cadl` package shadows the `cadl` compiler (cadl-lang).
 """SoS-DSL contract runtime — engine implementation (Appendix E v0.1).
 
 Single-file, dependency-free (stdlib only). Designed to be embedded
-into the raspimouse-swarm-simulator process and driven by the
+into the simulator process and driven by the
 arbitrator / world simulator's event loop. The runtime is fully
 synchronous: callers post events and tick the clock; transitions and
 violations are emitted as side-effects.
@@ -30,8 +30,8 @@ Key design decisions
    are silently skipped — they are still valid CADL.
 
 4. **Logging.** All emitted events are appended to a ``log`` list and,
-   if a ``log_path`` was supplied, also serialized as NDJSON. The
-   cadl-explorer Violation Trace View consumes this NDJSON.
+   if a ``log_path`` was supplied, also serialized as NDJSON for
+   downstream tools (cadl-explorer reads the Sim-IR, not this log).
 """
 
 from __future__ import annotations
