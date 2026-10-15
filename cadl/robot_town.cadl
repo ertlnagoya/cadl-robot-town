@@ -28,15 +28,15 @@ sos:
       capabilities: [assign_order, record_violation, evict]
       interface:
         input:  [order_request, position_report, node_released]
-        output: [order_assignment, eviction_notice]
+        output: [order_assignment, eviction_notice, regime_notice]
 
     - id: "ROBOT[1..N]"
       role: "delivery_robot"
       autonomy: high
       capabilities: [move, park, pickup, dropoff]
       interface:
-        input:  [order_assignment, eviction_notice]
-        output: [position_report, node_released]
+        input:  [order_assignment, eviction_notice, regime_notice, amendment_proposal]
+        output: [position_report, node_released, ballot]
 
     - id: COUNCIL
       role: "rule_amendment_body"
