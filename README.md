@@ -34,7 +34,7 @@ four gates.
 ## Setup
 
 Assumes Course A's setup: the CADL compiler cloned to `~/program/cadl_repo`, as in
-[Section 2.4 of the Textbook](https://www.ertl.jp/cadl-spec/docs/textbook/toolchain-setup/),
+[Section 2.4 of the Textbook](https://www.ertl.jp/cadl-spec/docs/textbook/toolchain-setup/#24-setup-5-min),
 which also lists fixes for install problems.
 
 ```bash
