@@ -20,7 +20,8 @@
 ## セットアップ
 
 コース A のセットアップ（`~/program/cadl_repo` に CADL コンパイラをクローン）が
-済んでいることが前提。
+済んでいることが前提。手順とインストールの問題への対処は
+[テキストブックの 2.4 節](https://www.ertl.jp/cadl-spec/ja/docs/textbook/toolchain-setup/)にある。
 
 ```bash
 cd ~/program
