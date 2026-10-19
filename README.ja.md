@@ -243,7 +243,7 @@ python -m town.council --proposer replay --replay-dir examples/llm-replay --mode
   [2] 集荷の期限を 120 秒から 180 秒に延ばす
   集荷の期限を 120 秒から 180 秒に延ばす                     -     -      -          -    ○    ×    -    -     @amend 行の数値以外を書き換えている
   [3] hold_limit を「1 minute」と書き直す
-  hold_limit を「1 minute」と書き直す                  -     -      -          -    ×    -    -    -     IR に規則の値がそろっていません（…）
+  hold_limit を「1 minute」と書き直す                  -     -      -          -    ×    -    -    -     Type check failed: 1 error(s), 0 warning(s)
   → 採択なし（すべての案がどこかの関門で止まった）。規則は変わらない。
 ```
 
@@ -251,6 +251,13 @@ python -m town.council --proposer replay --replay-dir examples/llm-replay --mode
 
 `examples/llm-distributed/` は、Claude Opus 5.5 が実際に書いた案（2026-10-15、
 `--proposer llm --mode DISTRIBUTED --rounds 2`）。LLM を呼ばずに再生できる。
+
+2026-10-19 に、初期の規則の AMEND に 2 つのステップ（`TOWN_STEWARD -> COUNCIL :
+violation_report`、`COUNCIL -> TOWN_STEWARD : rule_update`）と、それに合わせた
+interface の項目を加えた。憲法の関門は案を現行の規則と 1 行ずつ比べるので、
+`examples/llm-distributed/` と `examples/llm-replay/` の記録済みの案すべてに、
+同じ行を機械的に入れてある。案のほかの部分は変えておらず、再生の結果も変わらない。
+各ファイルの `edits` にこのことを記録している。
 
 ```bash
 python -m town.council --proposer replay --replay-dir examples/llm-distributed --mode DISTRIBUTED --rounds 2

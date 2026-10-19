@@ -80,7 +80,14 @@ numbers, are in [README.ja.md](README.ja.md) and on the hands-on page.
   and pick the same best amendment as the rule-based search, but it mispredicts
   company B's vote and never proposes the loosening amendment that everyone
   accepts. `examples/llm-distributed/` is a real run you can replay without an
-  API key.
+  API key. On 2026-10-19 the starting rules gained two AMEND steps
+  (`TOWN_STEWARD -> COUNCIL : violation_report`, `COUNCIL -> TOWN_STEWARD :
+  rule_update`) and their interface entries. The same lines were inserted,
+  mechanically, into every recorded proposal in `examples/llm-distributed/`
+  and `examples/llm-replay/`, because the constitution gate compares a
+  proposal with the current rules line by line; nothing else in the proposals
+  changed, and the replays print the same results as before. Each file
+  records this in its `edits` field.
 
 ## License
 
