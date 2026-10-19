@@ -302,7 +302,7 @@ LLM の呼び出しには、安全分類器に断られたとき推奨のモデ�
   断定する。観測からはそこまで言えない）は、関門では検査していない。
 - Unity・実機での再生はまだない。
 - CADL 仕様の課題として見つかったもの：
-  - `cadl` 0.3.14 の `sim-ir` も `sos.transitions[*].safety_invariant` を IR に
+  - `cadl` 0.3.17 の `sim-ir` も `sos.transitions[*].safety_invariant` を IR に
     出力しない。`town/period.py` は検査を通ったソースから読んで添えている。
   - 運用モードに規則のパラメータ値を結びつける構文がない。集中モードで何が
     変わるか（待避所、エッジの専有）は、シミュレータ側（`town/world.py`）が決めている。
