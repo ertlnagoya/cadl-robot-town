@@ -27,8 +27,8 @@ sos:
       autonomy: low
       capabilities: [assign_order, record_violation, evict]
       interface:
-        input:  [order_request, position_report, node_released]
-        output: [order_assignment, eviction_notice, regime_notice]
+        input:  [order_request, position_report, node_released, rule_update]
+        output: [order_assignment, eviction_notice, regime_notice, violation_report]
 
     - id: "ROBOT[1..N]"
       role: "delivery_robot"
@@ -44,7 +44,7 @@ sos:
       capabilities: [propose_amendment, tally_ballots]
       interface:
         input:  [violation_report, ballot]
-        output: [amendment_proposal]
+        output: [amendment_proposal, rule_update]
 
   contracts:
     # ── 顧客への約束：注文 1 件ごとのインスタンス（改正の対象外） ──
@@ -132,9 +132,11 @@ sos:
     - id: AMEND
       trigger: "period_end"
       steps:
+        - "TOWN_STEWARD -> COUNCIL : violation_report"
         - "COUNCIL -> ROBOT[*] : amendment_proposal"
         - "ROBOT[*] -> COUNCIL : ballot"
         - "COUNCIL : tally_ballots"
+        - "COUNCIL -> TOWN_STEWARD : rule_update"
 
   metrics:
     - id: on_time_deliveries
