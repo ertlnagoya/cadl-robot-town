@@ -109,7 +109,11 @@ def build_request(rules_text: str, constitution_text: str, env: dict, cur: dict,
 
 def propose_llm(request: dict) -> tuple[list[dict], str, str]:
     """LLM に改正案を出させる。戻り値は（提案のリスト, 状況の説明, LLM の見立て）。"""
-    import anthropic
+    try:
+        import anthropic
+    except ModuleNotFoundError:
+        raise SystemExit("[ERROR] --proposer llm には Anthropic の SDK が必要です。"
+                         "`pip install anthropic` を実行してください。")
 
     client = anthropic.Anthropic()
     try:

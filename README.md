@@ -53,11 +53,11 @@ pip install anthropic                  # only for --proposer llm
 ```bash
 python -m town.period --mode DISTRIBUTED        # one period (one simulated hour)
 python -m town.council --mode DISTRIBUTED       # one round of the amendment loop
-python -m town.council --rounds 6               # six periods, demand from scenario.yaml
+python -m town.council --mode DISTRIBUTED --rounds 6 --name seasons-d   # six periods, demand from scenario.yaml
 python -m town.council --objective road_violations --mode DISTRIBUTED --rounds 8 --name goodhart-d
-python -m town.compare runs/goodhart-d/v1.cadl runs/goodhart-d/v5.cadl --mode DISTRIBUTED
+python -m town.compare runs/goodhart-d/v1.cadl runs/goodhart-d/v5.cadl runs/seasons-d/v7.cadl --mode DISTRIBUTED
 python -m town.period --rush 1200 2400 25 --no-quiescence
-python -m town.council --proposer llm --rounds 3                       # needs ANTHROPIC_API_KEY
+python -m town.council --proposer llm --mode DISTRIBUTED --rounds 2 --name llm-distributed   # needs ANTHROPIC_API_KEY
 python -m town.council --proposer replay --replay-dir examples/llm-distributed --mode DISTRIBUTED --rounds 2
 ```
 
