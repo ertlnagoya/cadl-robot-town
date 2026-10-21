@@ -225,7 +225,7 @@ LLM が「何を変えたか」をどう申告しても信用せず、返って�
 
 ```bash
 export ANTHROPIC_API_KEY=...                       # または `ant auth login`
-python -m town.council --proposer llm --rounds 3
+python -m town.council --proposer llm --mode DISTRIBUTED --rounds 2 --name llm-distributed
 python -m town.council --proposer llm --check      # LLM を呼ばず、配線だけ確かめる
 ```
 
