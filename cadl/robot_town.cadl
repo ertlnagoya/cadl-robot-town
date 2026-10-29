@@ -6,8 +6,10 @@
 # 使えない。仕事のないロボットは車庫に戻るか、道路上（中央の交差点 8）
 # に止まって次の注文を待つ。止まったロボットは他社の通行をふさぐ。
 #
-# `# @amend:<名前>` が付いた行は、委員会（COUNCIL）が改正してよい
-# パラメータ。どこまで動かしてよいかは constitution.yaml が決める。
+# `# @amend:<名前>` が付いた行は、改正してよいパラメータ。どの層（規則・
+# 契約）に属し、どこまで動かしてよいかは constitution.yaml が決める。
+# 委員会（COUNCIL）が自分で改正できるのは規則の層だけで、契約の層を
+# 変えるには人間の判断が要る。
 # =====================================================================
 
 sos:
@@ -47,12 +49,12 @@ sos:
         output: [amendment_proposal, rule_update]
 
   contracts:
-    # ── 顧客への約束：注文 1 件ごとのインスタンス（改正の対象外） ──
+    # ── 顧客への約束：注文 1 件ごとのインスタンス（契約の層。人間が決める） ──
     - id: DELIVERY_SLA
       parties: [TOWN_STEWARD, "ROBOT[*]"]
       guarantee:
-        - "pickup_time <= 120s"
-        - "dropoff_time <= 120s"
+        - "pickup_time <= 120s"         # @amend:pickup_deadline
+        - "dropoff_time <= 120s"        # @amend:dropoff_deadline
       lifecycle:
         states: [Assigned, PickedUp, Delivered, Late]
         initial: Assigned
@@ -62,13 +64,13 @@ sos:
             from: Assigned
             to:   PickedUp
             on:   "ROBOT[i].status == PickedUp"
-            deadline: 120s
+            deadline: 120s            # @amend:pickup_deadline
             on_violation: { transition: Late, severity: Major }
           - id: dropoff
             from: PickedUp
             to:   Delivered
             on:   "ROBOT[i].status == Delivered"
-            deadline: 120s
+            deadline: 120s            # @amend:dropoff_deadline
             on_violation: { transition: Late, severity: Major }
 
     # ── 道路の使い方：道路上に止まるたびに 1 インスタンス ──

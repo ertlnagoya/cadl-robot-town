@@ -1,34 +1,59 @@
-# 憲法：委員会（COUNCIL）の改正の範囲と、採択の条件。
+# 憲法（規制）：改正の範囲と、採択の条件。
 # 規則（cadl/robot_town.cadl）は改正ループが書き換えるが、このファイルは書き換えない。
+# 規制を変えられるのは人間だけで、town.steward の判断要求を通して、
+# runs/<名前>/constitution-v<k>.yaml という別の版として残す。
 
 # 改正してよいパラメータ。CADL の `# @amend:<名前>` 行の数値だけを、
 # 1 回の改正で 1 ステップだけ動かせる。
+# layer は改正の層。rule（規則）は関門を通れば採択できる。contract（契約）は
+# 顧客との約束で、委員会（town.council）は変えられず、town.steward では必ず
+# 人間に判断を求める。safety: true のパラメータ（運用モードの切替）も、
+# town.steward では必ず人間に判断を求める。
 amendable:
   hold_limit:        # ROAD_USE.release の deadline（道路上に止まってよい秒数）
+    layer: rule
     unit: s
     min: 10          # 荷の積み下ろしに 10 秒はかかる
     max: 120
     step: 10
   block_k:           # blocking_guard が退去させる、後ろで待つ台数のしきい値
+    layer: rule
     unit: ""
     min: 1
     max: 4
     step: 1
   sanction_lambda:   # 違反 1 件あたりの罰点の倍率（Minor=1, Major=3）
+    layer: rule
     unit: ""
     min: 0.0
     max: 2.0
     step: 0.5
   to_central:        # 分散 → 集中に切り替える、5 分間の注文件数の上限（これ未満で集中へ）
+    layer: rule
+    safety: true
     unit: 件
     min: 10
     max: 30
     step: 2
   to_distributed:    # 集中 → 分散に戻す、5 分間の注文件数のしきい値（これ以上で分散へ）
+    layer: rule
+    safety: true
     unit: 件
     min: 14
     max: 40
     step: 2
+  pickup_deadline:   # DELIVERY_SLA.pickup の deadline（注文から集荷までの約束の秒数）
+    layer: contract
+    unit: s
+    min: 60
+    max: 180
+    step: 30
+  dropoff_deadline:  # DELIVERY_SLA.dropoff の deadline（集荷から配達までの約束の秒数）
+    layer: contract
+    unit: s
+    min: 60
+    max: 180
+    step: 30
 
 # 改正後も守られなければならない条件（同じ乱数シードの平均で判定）。
 invariants:
@@ -44,6 +69,13 @@ min_improvement: 1.0              # これ未満の改善は採択しない（�
 # 投票：各社は自社の効用（定時配達件数 − 罰点）が下がらなければ賛成する。
 vote:
   quorum: 2                       # 3 社中 2 社の賛成で採択
+
+# 規制の層：town.steward の LLM が改正を提案してよい、この憲法の値。
+# 採否は必ず人間が決める。
+regulation:
+  invariants.min_company_on_time_rate: {min: 0.5, max: 0.95, step: 0.05}
+  invariants.max_unfinished_orders:    {min: 0,   max: 5,    step: 1}
+  vote.quorum:                         {min: 1,   max: 3,    step: 1}
 
 seeds: [1, 2, 3, 4, 5]
 period_s: 3600

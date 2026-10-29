@@ -1,0 +1,27 @@
+# Answers to the decision requests of a real run with Claude Opus 5.5 (2026-10-29/30).
+# The human (operator) role was played by Claude when this record was made. To answer
+# yourself, drop --answers and answer in the terminal, or edit this file.
+K1:
+  choice: "1"
+  reason: Follow the order of the KPI. Town-wide on-time deliveries are the main goal, and the worst company's on-time rate, unfinished orders and late deliveries are watched. The floors are provisional, as the LLM says; 0.8 keeps today's worst company (0.84) from falling further. I agree that loosening the promised times does not count as improving the KPI.
+  assumptions:
+    - Customers cannot choose their delivery company
+D1:
+  choice: "1"
+  reason: The intersections are a road shared by the three companies; waiting there is no company's right. Late deliveries fall from 10.4 to 1.2 and the worst company's on-time rate rises, so adopt it against B's and C's votes. Re-measure C's utility (28.8 to 19.0) and the road violations next period. The constitutional floor (R1) can wait; it changes nothing now.
+  assumptions:
+    - B and C keep delivering in town after the rules change
+D2:
+  choice: keep
+  reason: Only 2 of 5 seeds improve. Do not cut C's utility by 16 for a gain that is not certain.
+K5:
+  choice: "1"
+  reason: In the quiet season there are almost no late deliveries, so narrowing the gap between the companies' gains and losses comes first. A change that narrows the gap while on-time deliveries or total sanctions get worse is caught by the watches and decided case by case.
+D5:
+  choice: "1"
+  reason: Switching off sanctions (3) narrows the gap only on paper and changes nothing about how the road is used. Returning block_k to 3 (2) adds about 6 late deliveries, and nothing undoes D1's reason (fewer late deliveries for customers). hold_limit 70 s narrows the gap at almost no cost to on-time delivery.
+  assumptions:
+    - Late deliveries rising from 1.8 to 2.4 is acceptable to customers
+D6:
+  choice: keep
+  reason: The gap narrows by only 1.6, by moving utility from A and B to C, while on-time deliveries and the spread of on-time rates both get worse. Do not extend hold_limit beyond D5's reason for 70 s (almost no cost to on-time delivery).

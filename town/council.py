@@ -12,6 +12,7 @@
 
   1. 検査   ：cadl check / cadl sim-ir を通る
   2. 憲法   ：変えたのが @amend 行の数値だけで、1 パラメータ 1 ステップの範囲内。
+              委員会が変えてよいのは規則の層（layer: rule）だけで、契約の層は変えられない。
               さらに、改正後のシミュレーションで不変条件（各社の定時率の下限など）を守る
   3. 改善   ：現行の規則より目標（objective）が min_improvement 以上よい
   4. 投票   ：自社の効用が下がらない会社が quorum 社以上いる
@@ -40,17 +41,23 @@ from .period import (CONSTITUTION, DEFAULT_RULES, ROOT, SCENARIO, CompileError,
                      compile_rules, evaluate)
 
 TAG = re.compile(r"#\s*@amend:(\w+)")
+LAYER_LABEL = {"rule": "規則", "contract": "契約", "regulation": "規制"}
 NUM = re.compile(r"\d+(?:\.\d+)?")
 
 
 def read_params(text: str) -> dict[str, float]:
-    """`# @amend:<名前>` が付いた行の、コメントより前にある最初の数値を読む。"""
-    params = {}
+    """`# @amend:<名前>` が付いた行の、コメントより前にある最初の数値を読む。
+    同じ名前の行が複数あるとき（契約の guarantee と deadline など）は、最後の行の値。"""
+    return {k: v[-1] for k, v in _tag_values(text).items()}
+
+
+def _tag_values(text: str) -> dict[str, list[float]]:
+    values: dict[str, list[float]] = {}
     for line in text.splitlines():
         m = TAG.search(line)
         if m:
-            params[m.group(1)] = float(NUM.search(line[:m.start()]).group())
-    return params
+            values.setdefault(m.group(1), []).append(float(NUM.search(line[:m.start()]).group()))
+    return values
 
 
 def write_param(text: str, name: str, value: float) -> str:
@@ -66,10 +73,13 @@ def write_param(text: str, name: str, value: float) -> str:
     return "".join(out)
 
 
-def candidates(params: dict[str, float], amendable: dict) -> list[tuple[str, float, float]]:
-    """各パラメータを 1 ステップ上げ下げした案（憲法の範囲内のものだけ）。"""
+def candidates(params: dict[str, float], amendable: dict,
+               layers: tuple[str, ...] = ("rule",)) -> list[tuple[str, float, float]]:
+    """各パラメータを 1 ステップ上げ下げした案（憲法の範囲内で、layers の層のものだけ）。"""
     out = []
     for name, spec in amendable.items():
+        if spec.get("layer", "rule") not in layers:
+            continue
         cur = params[name]
         for v in (cur - spec["step"], cur + spec["step"]):
             v = round(v, 6)
@@ -79,23 +89,29 @@ def candidates(params: dict[str, float], amendable: dict) -> list[tuple[str, flo
 
 
 def _canonical(text: str) -> list[str]:
-    """@amend 行の数値を伏せた、比較用の行の並び。"""
+    """@amend 行の数値を伏せた、比較用の行の並び。数値の桁数が変わって
+    コメントの前の空白がずれても、同じ行とみなす。"""
     out = []
     for line in text.splitlines():
         m = TAG.search(line)
         if m:
             body = line[:m.start()]
-            line = NUM.sub("<v>", body, count=1) + line[m.start():]
+            line = NUM.sub("<v>", body, count=1).rstrip() + " " + line[m.start():]
         out.append(line.rstrip())
     while out and not out[-1]:
         out.pop()
     return out
 
 
-def check_amendment(cur_text: str, cand_text: str, amendable: dict) -> tuple[bool, str]:
-    """憲法の文面の関門：@amend 行の数値以外を変えていないか、変え方が範囲内か。"""
+def check_amendment(cur_text: str, cand_text: str, amendable: dict,
+                    layers: tuple[str, ...] = ("rule",)) -> tuple[bool, str]:
+    """憲法の文面の関門：@amend 行の数値以外を変えていないか、変え方が範囲内か。
+    layers は、変えてよい層（委員会は規則の層だけ）。"""
     if _canonical(cur_text) != _canonical(cand_text):
         return False, "@amend 行の数値以外を書き換えている"
+    for k, vs in _tag_values(cand_text).items():
+        if len(set(vs)) > 1:
+            return False, f"{k} の行どうしで値が食い違う（{', '.join(f'{v:g}' for v in vs)}）"
     old, new = read_params(cur_text), read_params(cand_text)
     changed = {k: (old[k], new[k]) for k in old if abs(old[k] - new[k]) > 1e-9}
     if not changed:
@@ -104,6 +120,8 @@ def check_amendment(cur_text: str, cand_text: str, amendable: dict) -> tuple[boo
         return False, f"{len(changed)} つのパラメータを同時に変えている"
     (name, (a, b)), = changed.items()
     spec = amendable[name]
+    if spec.get("layer", "rule") not in layers:
+        return False, f"{name} は{LAYER_LABEL[spec['layer']]}の層で、ここでは変えられない"
     if not spec["min"] <= b <= spec["max"]:
         return False, f"{name}={b:g} は範囲 {spec['min']:g}〜{spec['max']:g} の外"
     if abs(abs(b - a) - spec["step"]) > 1e-9:

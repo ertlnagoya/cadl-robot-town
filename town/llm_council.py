@@ -46,7 +46,8 @@ SYSTEM = f"""\
 1. 検査：cadl check と cadl sim-ir を通ること
 2. 憲法：constitution.yaml を守ること。変えてよいのは `# @amend:<名前>` が付いた
    行の数値だけで、一度に動かせるのは 1 つのパラメータを 1 ステップだけです。
-   ほかの行（コメントを含む）は一字一句変えてはいけません。改正後のシミュレー
+   ほかの行（コメントを含む）は一字一句変えてはいけません。顧客への約束
+   （DELIVERY_SLA）の @amend 行は契約の層で、委員会は変えられません。改正後のシミュレー
    ションで、不変条件（各社の定時率の下限など）も守られる必要があります。
 3. 改善：委員会の目標（objective）が、同じ乱数シードで現行より改善すること
 4. 投票：各社は自社の効用（定時配達件数 − 罰点）が下がらなければ賛成し、
@@ -107,12 +108,13 @@ def build_request(rules_text: str, constitution_text: str, env: dict, cur: dict,
     }
 
 
-def propose_llm(request: dict) -> tuple[list[dict], str, str]:
-    """LLM に改正案を出させる。戻り値は（提案のリスト, 状況の説明, LLM の見立て）。"""
+def call_json(request: dict) -> tuple[dict | None, str]:
+    """構造化出力の依頼を送り、（JSON として読んだ出力, 状況の説明）を返す。
+    失敗したときは出力が None で、説明に理由が入る。"""
     try:
         import anthropic
     except ModuleNotFoundError:
-        raise SystemExit("[ERROR] --proposer llm には Anthropic の SDK が必要です。"
+        raise SystemExit("[ERROR] LLM を呼ぶには Anthropic の SDK が必要です。"
                          "`pip install anthropic` を実行してください。")
 
     client = anthropic.Anthropic()
@@ -128,24 +130,34 @@ def propose_llm(request: dict) -> tuple[list[dict], str, str]:
         raise SystemExit("[ERROR] Claude API の認証情報が見つかりません。ANTHROPIC_API_KEY を設定するか、"
                          f"`ant auth login` を実行してください。（{e}）")
     except anthropic.RateLimitError:
-        return [], "API の利用上限に達したため、この期は LLM の案なし", ""
+        return None, "API の利用上限に達した"
     except anthropic.APIStatusError as e:
-        return [], f"API エラー {e.status_code}（{e.message[:300]}）のため、この期は LLM の案なし", ""
+        return None, f"API エラー {e.status_code} が返った（{e.message[:300]}）"
     except anthropic.APIConnectionError:
-        return [], "API に接続できないため、この期は LLM の案なし", ""
+        return None, "API に接続できない"
     if msg.stop_reason == "refusal":
-        return [], "LLM が応答を断ったため、この期は LLM の案なし", ""
+        return None, "LLM が応答を断った"
     if msg.stop_reason == "max_tokens":
-        return [], "出力が上限で途切れたため、この期は LLM の案なし", ""
+        return None, "出力が上限で途切れた"
     text = next((b.text for b in msg.content if b.type == "text"), "")
     try:
         data = json.loads(text)
-        proposals = data["proposals"][:MAX_PROPOSALS]
-    except (json.JSONDecodeError, KeyError, TypeError):
-        return [], "LLM の出力を JSON として読めないため、この期は LLM の案なし", ""
+    except json.JSONDecodeError:
+        return None, "LLM の出力を JSON として読めない"
     u = msg.usage
-    return (proposals, f"{msg.model}、入力 {u.input_tokens} / 出力 {u.output_tokens} トークン",
-            data.get("assessment", ""))
+    return data, f"{msg.model}、入力 {u.input_tokens} / 出力 {u.output_tokens} トークン"
+
+
+def propose_llm(request: dict) -> tuple[list[dict], str, str]:
+    """LLM に改正案を出させる。戻り値は（提案のリスト, 状況の説明, LLM の見立て）。"""
+    data, note = call_json(request)
+    if data is None:
+        return [], f"{note}ため、この期は LLM の案なし", ""
+    try:
+        proposals = data["proposals"][:MAX_PROPOSALS]
+    except (KeyError, TypeError):
+        return [], "LLM の出力に proposals がないため、この期は LLM の案なし", ""
+    return proposals, note, data.get("assessment", "")
 
 
 def save(path: Path, proposals: list[dict], note: str, assessment: str) -> None:
