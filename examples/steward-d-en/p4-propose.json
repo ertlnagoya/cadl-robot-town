@@ -1,0 +1,9 @@
+{
+  "note": "claude-opus-5-5、入力 7152 / 出力 1058 トークン",
+  "request_digest": "7876cbc4d3431703",
+  "data": {
+    "assessment": "Under the busy period with rush, the current rules deliver 272.6 of 274.6 orders on time. Nothing is left unfinished, and the worst company's on-time rate is 0.98, so both KPI guards (≥0.8, ≤3) hold by a wide margin. Only about 2 orders per period are late (A 1.8, B 0.2, C 0). That leaves at most about 2 on-time deliveries to gain, close to the 1.0 minimum-improvement threshold and within seed noise. The remaining friction is on the road (14 release overstays and 15.6 blocking evictions, mostly penalizing B and C). It is not hurting customers. A loses the most time to blocking (516 s) but still reaches 0.98 on time.",
+    "proposals": [],
+    "regulation_proposals": []
+  }
+}

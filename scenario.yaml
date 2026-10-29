@@ -4,14 +4,15 @@
 #
 # order_interval_s: 各社の注文の平均間隔（秒）。小さいほど忙しい。
 # rush: 期の途中で注文が集中する時間帯（開始秒・終了秒・その間の平均間隔）。
+# label_en: --lang en のときの名前。
 # seed_offset: この期の乱数シードは constitution.yaml の seeds にこれを足したもの。
 #              期ごとに注文の並びが変わる。同じ期の中では全案を同じシードで比べる。
 periods:
-  - {label: 平常,   order_interval_s: 75,  seed_offset: 0}
-  - {label: 平常＋ラッシュ, order_interval_s: 75, seed_offset: 100,
+  - {label: 平常,   label_en: normal, order_interval_s: 75,  seed_offset: 0}
+  - {label: 平常＋ラッシュ, label_en: normal + rush, order_interval_s: 75, seed_offset: 100,
      rush: {from_s: 1200, to_s: 2400, order_interval_s: 25}}
-  - {label: 繁忙期, order_interval_s: 45,  seed_offset: 200}
-  - {label: 繁忙期＋ラッシュ, order_interval_s: 45, seed_offset: 300,
+  - {label: 繁忙期, label_en: busy, order_interval_s: 45,  seed_offset: 200}
+  - {label: 繁忙期＋ラッシュ, label_en: busy + rush, order_interval_s: 45, seed_offset: 300,
      rush: {from_s: 1200, to_s: 2400, order_interval_s: 25}}
-  - {label: 閑散期, order_interval_s: 120, seed_offset: 400}
-  - {label: 閑散期, order_interval_s: 120, seed_offset: 500}
+  - {label: 閑散期, label_en: quiet, order_interval_s: 120, seed_offset: 400}
+  - {label: 閑散期, label_en: quiet, order_interval_s: 120, seed_offset: 500}

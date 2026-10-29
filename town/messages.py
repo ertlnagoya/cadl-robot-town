@@ -1,0 +1,276 @@
+"""town.steward が人間に見せる文言（日本語・英語）。--lang で選ぶ。
+
+LLM への依頼の本文（town/llm_steward.py）は日本語のままで、LLM が書く文章の
+言語だけを --lang に合わせる。town.period / town.council / town.compare の出力は
+日本語のまま。
+"""
+from __future__ import annotations
+
+import re
+
+MSG = {
+    "ja": {
+        "period_head": "\n=== 第 {k} 期（{label}：注文の平均間隔 {interval:g} 秒）  現行 v{v}: {params} ===",
+        "kpi_line": "  KPI（第 {since} 期から）: {text}",
+        "kpi_fail": "[ERROR] KPI を測り方に言い換えられませんでした（{note}）。",
+        "kpi_none": "[ERROR] 使える測り方が 1 つもありません。",
+        "kpi_reject": "  [却下] 測り方の案 {i}「{label}」: {why}",
+        "reading": "  読み方: {text}",
+        "concern": "   懸念: {text}",
+        "revisit": "   見直し対象: {d} — {why}",
+        "kpi_sec": "## K{k} 第 {k} 期：KPI（第 {since} 期から）の読み方 — {how}\n",
+        "asked": "人間が判断", "unasked": "確かめずに使用", "auto": "自動",
+        "md_kpi": "- KPI（人間が書いたもの）: {text}",
+        "md_reading": "- LLM の読み方: {text}",
+        "md_option": "- 選択肢 {i}「{label}」: {desc}。{note}",
+        "md_concern": "- 懸念: {text}",
+        "md_revisit": "- 見直し対象: {d} — {why}",
+        "md_reco": "- LLM の推奨: {id}",
+        "md_reco_r": "- LLM の推奨: {id} — {reason}",
+        "md_chosen": "- 人間が選んだもの: {id}「{label}」",
+        "md_reason": "- 理由（人間）: {text}",
+        "md_assume": "- 前提（人間）: {text}",
+        "md_gsn": "- GSN（人間）: {type} — {text}",
+        "kpi_ask": "  → 判断要求 K{k}（LLM の推奨: {id}）",
+        "gsn_kpi": "第 {since} 期からの KPI: {text}",
+        "gsn_measure": "測り方（{who}）: {desc}", "by_human": "人間が選んだ", "by_llm": "LLM の読み方",
+        "log_kpi": "KPI「{text}」を {desc} と読む",
+        "current": "  現行: 定時配達 {on:.1f}  遅配 {late:.1f}  ふさがれた時間 {blk:.0f}s  道路の違反 {road:.1f}"
+                   "  主目標 {metric} = {val:.2f}",
+        "assessment": "  見立て: {text}",
+        "evidence_head": "# 第 {k} 期（{label}）の測定\n\nKPI の測り方: {desc}\n\n",
+        "d_sec": "## D{k} 第 {k} 期（{label}）— {how}\n",
+        "md_measure": "- KPI の測り方: {desc}",
+        "md_assess": "- LLM の見立て: {text}", "none": "（なし）",
+        "md_evidence": "- 測った結果: [p{k}-evidence.md](p{k}-evidence.md)",
+        "md_whyasked": "- 判断を求めた理由:",
+        "md_request": "- 判断要求: [p{k}-request.md](p{k}-request.md)（問い: {q}）",
+        "md_unknown": "- LLM が知らないこと: {text}",
+        "md_result": "- 結果（{who}）: {what}",
+        "item": "- {id}「{label}」: {text}", "opt_line": "- {id}: {label}（{title}）",
+        "opt_auto": "。自動で採択できる案",
+        "opt_keep": "- keep: 変えない（現行 v{v} のまま）",
+        "keep": "変えない",
+        "tmpl_q": "第 {k} 期の改正をどうするか",
+        "tmpl_best": "定型の文面：自動で採択できる案",
+        "tmpl_keep": "定型の文面：自動で採択できる案がないので、変えない",
+        "tmpl_note": "。定型の文面で示す",
+        "bad_ids": "LLM が渡していない選択肢を書いた",
+        "d_ask": "  → 判断要求 D{k}（LLM: {note}）",
+        "req_title": "# 判断要求 D{k}：第 {k} 期（{label}）",
+        "req_q": "**問い**：{q}",
+        "req_why": "## 判断を求める理由", "req_opts": "## 選択肢", "req_table": "## 測った結果",
+        "req_reco": "## LLM の推奨\n\n{id}：{reason}", "req_unknown": "## LLM が知らないこと、測っていないこと",
+        "req_opt": "- **{id}**：{head}。{summary}", "req_stake": "（当事者: {text}）",
+        "reco": "  LLM の推奨: {id} — {reason}",
+        "unknown": "  LLM が知らないこと: {text}",
+        "adopted": "v{v} {label}（{layer}、主目標 {gain:+.1f}，賛成 {yes}）", "nobody": "なし",
+        "override": "。投票の結果を覆して採択",
+        "reg_adopted": "規制 {label}（constitution-v{v}.yaml）",
+        "human": "人間",
+        "outcome": "  → {who}: {what}",
+        "history": "- 第 {k} 期（{label}）: {what}（{who}）\n",
+        "gsn_s": "第 {k} 期: {what}",
+        "gsn_sn": "同じシードで測った結果（p{k}-evidence.md）",
+        "gsn_c": "第 {k} 期の環境: {label}（注文の平均間隔 {interval:g} 秒）",
+        "gsn_j_auto": "関門をすべて通り、人間に判断を求める条件に当たらない",
+        "gsn_j_none": "採択できる案がなく、判断を求める条件にも当たらない",
+        "gsn_top": "街の運用が、人間の定めた KPI を満たし続ける",
+        "gsn_by_version": "KPI の版ごとに論じる",
+        "gsn_title": "# 判断の GSN",
+        "decisions_title": "# 判断の記録（{name}、運用モード {mode}）\n",
+        "history_title": "# 改正履歴\n",
+        "done": "\n記録: {dir}/  （decisions.md, gsn.yaml, gsn.md, history.md, answers.yaml, v1.cadl 〜 v{v}.cadl）",
+        "llm": "  LLM: {note}",
+        "r_agree": "合意：主目標 {metric} が {gain:+.1f} よくなるが、{no} 社が反対して否決された",
+        "r_contract": "契約：顧客との約束（DELIVERY_SLA）を変える。顧客は投票に加わらない",
+        "r_reg": "規制：憲法の値を変える（{effect}）",
+        "r_safety": "安全：運用モードの切替の条件を変える",
+        "r_conflict": "KPI の衝突：主目標は {gain:+.1f} よくなるが、{why}",
+        "r_worse": "{m} が悪化する",
+        "r_uncertain": "不確か：平均では {gain:+.1f} だが、改善したシードは {n}/{total}",
+        "r_llm": "LLM：{text}",
+        "sep": "；", "comma": "、", "and": "・",
+        "t_head": "| id | 案 | 層 | 検査 | 憲法 | 定時配達 | 遅配 | ふさがれた秒 | 道路の違反 | 最低の定時率 "
+                  "| 主目標 {metric} の差 | 改善したシード | KPI の条件 | 効用 A / B / C | 投票 A B C | 備考 |",
+        "t_current": "現行", "t_worse": "悪化: ", "t_watch": "見張る目標と条件の値",
+        "reg_ok": "現行の規則は新しい条件を満たす", "reg_ng": "現行の規則は新しい条件を満たさない（{why}）",
+        "reg_same": "この期の案の投票の結果は変わらない", "reg_flip": "この期の案 {ids} の投票の結果が変わる",
+        "reg_notkey": "{key} は規制の改正の対象ではない",
+        "reg_range": "{key}={v:g} は範囲 {lo:g}〜{hi:g} の外",
+        "reg_step": "{key} を {d:g} 動かしている（1 回に {step:g} まで）",
+        "a_given": "  人間の答え（--answers）: {id}", "a_reason": "。理由: {text}",
+        "a_bad": "[ERROR] {rid} の答え {id!r} は選択肢（{ids}）にありません。",
+        "a_shape": "[ERROR] --answers の {rid} には choice: が要ります（例: {rid}: {{choice: keep, reason: ...}}）。",
+        "a_gsn": "[ERROR] --answers の {rid} の gsn: の要素には、type: と text: の両方が要ります。",
+        "no_propose": "[ERROR] 改正案の記録がありません（{note}）。--replay-dir を確かめてください。",
+        "a_choose": "  選ぶ id（{ids}）: ",
+        "a_reason_q": "  理由（自然言語。GSN で書くときは空のまま Enter し、あとで answers.yaml に gsn: を書く）: ",
+        "a_assume_q": "  前提（GSN の Assumption。なければ空のまま Enter）: ",
+        "a_eof": "\n[STOP] 判断要求 {rid} の入力が途中で終わりました。ここまでの答えは {path} にあります。",
+        "a_stop": "\n[STOP] 判断要求 {rid} に答えが要ります。{req} を読み、--answers の YAML に\n"
+                  "  {rid}:\n    choice: <{ids}>\n    reason: <理由>\n"
+                  "を書き、同じ --name のまま、同じコマンドに --answers <YAML> を足してもう一度実行してください"
+                  "（この実行の LLM の出力は {llm} に残っており、呼び直さずに使います）。",
+        "brief": "- {id}（第 {k} 期、{who}）: {summary}", "brief_r": "。人間の理由: {text}",
+        "layer": {"rule": "規則", "contract": "契約", "regulation": "規制"},
+        "goal_up": "増やす", "goal_down": "減らす", "main": "主目標 ", "cond": "。条件 ",
+        "guard_ng": "KPI の条件を破る（{m} {x:g}、条件 {op} {v:g}）",
+        "replay": "再生: {path}（{note}）",
+        "digest": "。注意：記録したときと依頼の内容が違う（kpi.md、規則、これまでの判断のどれかが変わった）。"
+                  "記録の出力をそのまま使う",
+        "no_record": "{step}.json の記録がない",
+        "write_in": "文章はすべて日本語で書いてください。",
+    },
+    "en": {
+        "period_head": "\n=== Period {k} ({label}: mean order interval {interval:g} s)  current v{v}: {params} ===",
+        "kpi_line": "  KPI (from period {since}): {text}",
+        "kpi_fail": "[ERROR] Could not turn the KPI into a measure ({note}).",
+        "kpi_none": "[ERROR] No usable measure.",
+        "kpi_reject": "  [rejected] measure {i} \"{label}\": {why}",
+        "reading": "  Reading: {text}",
+        "concern": "   Concern: {text}",
+        "revisit": "   To review: {d} — {why}",
+        "kpi_sec": "## K{k} Period {k}: reading the KPI (from period {since}) — {how}\n",
+        "asked": "decided by the human", "unasked": "used without asking", "auto": "automatic",
+        "md_kpi": "- KPI (written by the human): {text}",
+        "md_reading": "- The LLM's reading: {text}",
+        "md_option": "- Option {i} \"{label}\": {desc}. {note}",
+        "md_concern": "- Concern: {text}",
+        "md_revisit": "- To review: {d} — {why}",
+        "md_reco": "- The LLM recommends: {id}",
+        "md_reco_r": "- The LLM recommends: {id} — {reason}",
+        "md_chosen": "- The human chose: {id} \"{label}\"",
+        "md_reason": "- Reason (human): {text}",
+        "md_assume": "- Assumption (human): {text}",
+        "md_gsn": "- GSN (human): {type} — {text}",
+        "kpi_ask": "  → Decision request K{k} (the LLM recommends {id})",
+        "gsn_kpi": "KPI from period {since}: {text}",
+        "gsn_measure": "Measure ({who}): {desc}", "by_human": "chosen by the human", "by_llm": "the LLM's reading",
+        "log_kpi": "read the KPI \"{text}\" as {desc}",
+        "current": "  Current: on-time {on:.1f}  late {late:.1f}  blocked {blk:.0f}s  road violations {road:.1f}"
+                   "  main goal {metric} = {val:.2f}",
+        "assessment": "  Assessment: {text}",
+        "evidence_head": "# Period {k} ({label}): measurements\n\nMeasure of the KPI: {desc}\n\n",
+        "d_sec": "## D{k} Period {k} ({label}) — {how}\n",
+        "md_measure": "- Measure of the KPI: {desc}",
+        "md_assess": "- The LLM's assessment: {text}", "none": "(none)",
+        "md_evidence": "- Measurements: [p{k}-evidence.md](p{k}-evidence.md)",
+        "md_whyasked": "- Why the human was asked:",
+        "md_request": "- Decision request: [p{k}-request.md](p{k}-request.md) (question: {q})",
+        "md_unknown": "- The LLM does not know: {text}",
+        "md_result": "- Outcome ({who}): {what}",
+        "item": "- {id} \"{label}\": {text}", "opt_line": "- {id}: {label} ({title})",
+        "opt_auto": "; can be adopted automatically",
+        "opt_keep": "- keep: no change (stay at v{v})",
+        "keep": "no change",
+        "tmpl_q": "What to amend in period {k}",
+        "tmpl_best": "template text: the proposal that can be adopted automatically",
+        "tmpl_keep": "template text: nothing can be adopted automatically, so no change",
+        "tmpl_note": "; shown as template text",
+        "bad_ids": "the LLM wrote an option it was not given",
+        "d_ask": "  → Decision request D{k} (LLM: {note})",
+        "req_title": "# Decision request D{k}: period {k} ({label})",
+        "req_q": "**Question**: {q}",
+        "req_why": "## Why the human is asked", "req_opts": "## Options", "req_table": "## Measurements",
+        "req_reco": "## The LLM's recommendation\n\n{id}: {reason}",
+        "req_unknown": "## What the LLM does not know or has not measured",
+        "req_opt": "- **{id}**: {head}. {summary}", "req_stake": " (stakeholders: {text})",
+        "reco": "  The LLM recommends: {id} — {reason}",
+        "unknown": "  The LLM does not know: {text}",
+        "adopted": "v{v} {label} ({layer}, main goal {gain:+.1f}, yes: {yes})", "nobody": "none",
+        "override": "; adopted against the vote",
+        "reg_adopted": "regulation {label} (constitution-v{v}.yaml)",
+        "human": "human",
+        "outcome": "  → {who}: {what}",
+        "history": "- Period {k} ({label}): {what} ({who})\n",
+        "gsn_s": "Period {k}: {what}",
+        "gsn_sn": "Measured on the same seeds (p{k}-evidence.md)",
+        "gsn_c": "Period {k} environment: {label} (mean order interval {interval:g} s)",
+        "gsn_j_auto": "Passed every gate and raised no reason to ask the human",
+        "gsn_j_none": "Nothing could be adopted and nothing raised a reason to ask",
+        "gsn_top": "The town keeps meeting the KPIs set by the human",
+        "gsn_by_version": "Argue per version of the KPI",
+        "gsn_title": "# GSN of the decisions",
+        "decisions_title": "# Record of decisions ({name}, operating mode {mode})\n",
+        "history_title": "# Amendment history\n",
+        "done": "\nRecords: {dir}/  (decisions.md, gsn.yaml, gsn.md, history.md, answers.yaml, v1.cadl … v{v}.cadl)",
+        "llm": "  LLM: {note}",
+        "r_agree": "agreement: the main goal {metric} improves by {gain:+.1f}, but {no} voted it down",
+        "r_contract": "contract: changes the promise to customers (DELIVERY_SLA); customers have no vote",
+        "r_reg": "regulation: changes a value of the constitution ({effect})",
+        "r_safety": "safety: changes an operating-mode switching condition",
+        "r_conflict": "KPI conflict: the main goal improves by {gain:+.1f}, but {why}",
+        "r_worse": "{m} gets worse",
+        "r_uncertain": "uncertain: {gain:+.1f} on average, but only {n}/{total} seeds improve",
+        "r_llm": "LLM: {text}",
+        "sep": "; ", "comma": ", ", "and": " and ",
+        "t_head": "| id | proposal | layer | check | constitution | on-time | late | blocked s | road violations "
+                  "| lowest on-time rate | change in {metric} | seeds improved | KPI conditions "
+                  "| utility A / B / C | votes A B C | notes |",
+        "t_current": "current", "t_worse": "worse: ", "t_watch": "watched goals and conditions",
+        "reg_ok": "the current rules meet the new condition", "reg_ng": "the current rules break the new condition ({why})",
+        "reg_same": "no vote of this period's proposals changes", "reg_flip": "the vote on proposal(s) {ids} changes",
+        "reg_notkey": "{key} is not a regulation that may be amended",
+        "reg_range": "{key}={v:g} is outside {lo:g}–{hi:g}",
+        "reg_step": "moves {key} by {d:g} (at most {step:g} at a time)",
+        "a_given": "  Human's answer (--answers): {id}", "a_reason": ". Reason: {text}",
+        "a_bad": "[ERROR] answer {id!r} to {rid} is not one of the options ({ids}).",
+        "a_shape": "[ERROR] {rid} in --answers needs a choice: (e.g. {rid}: {{choice: keep, reason: ...}}).",
+        "a_gsn": "[ERROR] every gsn: element of {rid} in --answers needs both type: and text:.",
+        "no_propose": "[ERROR] No record of the proposals ({note}). Check --replay-dir.",
+        "a_choose": "  Choose an id ({ids}): ",
+        "a_reason_q": "  Reason (in prose; to write GSN instead, press Enter and add gsn: to answers.yaml later): ",
+        "a_assume_q": "  Assumption (GSN Assumption; empty line to finish): ",
+        "a_eof": "\n[STOP] Input for decision request {rid} ended early. Answers so far are in {path}.",
+        "a_stop": "\n[STOP] Decision request {rid} needs an answer. Read {req}, write\n"
+                  "  {rid}:\n    choice: <{ids}>\n    reason: <your reason>\n"
+                  "to a YAML file, and rerun the same command, with the same --name, adding --answers <YAML> "
+                  "(this run's LLM outputs are kept in {llm} and reused, not requested again).",
+        "brief": "- {id} (period {k}, {who}): {summary}", "brief_r": ". Human's reason: {text}",
+        "layer": {"rule": "rule", "contract": "contract", "regulation": "regulation"},
+        "goal_up": "increase", "goal_down": "decrease", "main": "main goal ", "cond": "; conditions ",
+        "guard_ng": "breaks a KPI condition ({m} {x:g}, required {op} {v:g})",
+        "replay": "replay: {path} ({note})",
+        "digest": "; note: the request differs from the recorded one (kpi.md, the rules or an earlier "
+                  "decision changed); using the recorded output as is",
+        "no_record": "no record {step}.json",
+        "write_in": "Write every text field in English.",
+    },
+}
+
+# town.council の関門の理由（日本語）を英語にする
+GATE_EN = [
+    (r"^@amend 行の数値以外を書き換えている$", "changes more than the numbers on @amend lines"),
+    (r"^何も変えていない$", "changes nothing"),
+    (r"^(\d+) つのパラメータを同時に変えている$", r"changes \1 parameters at once"),
+    (r"^(\w+) の行どうしで値が食い違う（(.*)）$", r"the lines of \1 disagree (\2)"),
+    (r"^(\w+)=(\S+) は範囲 (\S+)〜(\S+) の外$", r"\1=\2 is outside \3–\4"),
+    (r"^(\w+) を (\S+) 動かしている（1 回に (\S+) まで）$", r"moves \1 by \2 (at most \3 at a time)"),
+    (r"^(\w+) は(規則|契約|規制)の層で、ここでは変えられない$", r"\1 is in another layer and cannot be changed here"),
+    (r"^定時率の下限割れ（(.*)）$", r"an on-time rate falls below the floor (\1)"),
+    (r"^未配達 (\S+) 件$", r"\1 orders left undelivered"),
+]
+
+
+class Messages:
+    def __init__(self, lang: str):
+        self.lang = lang
+        self.m = MSG[lang]
+
+    def __call__(self, key: str, **kw) -> str:
+        return self.m[key].format(**kw) if kw else self.m[key]
+
+    def note(self, text: str) -> str:
+        """LLM の呼び出しの説明（トークン数）を、--lang の言語にする。"""
+        if self.lang == "ja":
+            return text
+        return re.sub(r"、入力 (\d+) / 出力 (\d+) トークン", r", input \1 / output \2 tokens", text)
+
+    def gate(self, text: str) -> str:
+        if self.lang == "ja" or not text:
+            return text
+        for pat, rep in GATE_EN:
+            if re.match(pat, text):
+                return re.sub(pat, rep, text)
+        return text

@@ -5,8 +5,15 @@
 教材ページ：[コース D — ロボットの街](https://www.ertl.jp/cadl-spec/ja/docs/handson/robot-town-tutorial)
 
 3 社の配送ロボット（各社 2 台）が、ラズパイマウスのシミュレータと同じ
-11 ノードの道路網を共有する。道路のルールは CADL（`cadl/robot_town.cadl`）
-に書かれ、委員会がシミュレーション結果を見て改正していく。
+11 ノードの道路網を共有する。道路のルールと顧客への約束は CADL
+（`cadl/robot_town.cadl`）に書かれ、シミュレーション結果を見て改正していく。
+
+改正のループは 2 つある。
+
+| ループ | 目標を決めるのは | 改正案を出すのは | 決めきれないことは |
+|---|---|---|---|
+| `town.steward`（[後述](#人間が-kpi-を決めllm-が提案するtownsteward)） | 人間が自然言語で書く KPI（`kpi.md` か `kpi.en.md`、期ごとに変えてよい） | LLM（規則・規制・契約） | LLM が判断要求にまとめ、人間が答えて、理由を自然言語か GSN で残す |
+| `town.council` | `constitution.yaml` の `objective`（固定） | ルールベースの探索、または LLM（規則だけ） | 関門で機械的に決まる（否決されれば採らない） |
 
 - 規範の判定（期限・監視・状態遷移）は、コース A と同じ Python 参照
   ランタイム（`town/contract_engine.py`）が IR を読んで行う。
@@ -31,7 +38,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install --upgrade pip   # macOS の python3（3.9）の pip は古く、次の行が失敗する
 pip install -e ~/program/cadl_repo     # cadl コマンドと PyYAML が入る
-pip install anthropic                  # LLM の委員会（--proposer llm）を使うときだけ
+pip install anthropic                  # LLM を実際に呼ぶとき（town.steward、--proposer llm）だけ
 ```
 
 ## 1 期だけ動かす（分散モードに固定）
@@ -219,7 +226,7 @@ LLM が「何を変えたか」をどう申告しても信用せず、返って�
 | 関門 | 判定 | LLM の案で起こりうること |
 |---|---|---|
 | 検査 | `cadl check` / `cadl sim-ir` を通り、街を動かす値が IR にそろう | 書式の誤り、期限を「1 minute」と書くなど |
-| 憲法（文面） | 変えたのが `@amend` 行の数値だけで、1 パラメータ 1 ステップ | 改正の対象外（顧客への配達期限など）に手を出す、一度に大きく動かす |
+| 憲法（文面） | 変えたのが `@amend` 行の数値だけで、1 パラメータ 1 ステップ。委員会が変えてよいのは規則の層だけ | 契約の層（顧客への配達期限）に手を出す、一度に大きく動かす |
 | 憲法（不変条件） | 改正後のシミュレーションで、各社の定時率 6 割以上など | — |
 | 改善・投票 | ルールベースの案と同じ | もっともらしい理由でも、数字が伴わない |
 
@@ -241,7 +248,7 @@ python -m town.council --proposer replay --replay-dir examples/llm-replay --mode
   [1] block_k 3 → 2：居座りを早めに退去させる
   block_k 3 → 2：居座りを早めに退去させる               131.0  35.2 (34.0)      985s    ○    ○    ○   ○ × ×
   [2] 集荷の期限を 120 秒から 180 秒に延ばす
-  集荷の期限を 120 秒から 180 秒に延ばす                     -     -      -          -    ○    ×    -    -     @amend 行の数値以外を書き換えている
+  集荷の期限を 120 秒から 180 秒に延ばす                     -     -      -          -    ○    ×    -    -     pickup_deadline の行どうしで値が食い違う（120, 180）
   [3] hold_limit を「1 minute」と書き直す
   hold_limit を「1 minute」と書き直す                  -     -      -          -    ×    -    -    -     Type check failed: 1 error(s), 0 warning(s)
   → 採択なし（すべての案がどこかの関門で止まった）。規則は変わらない。
@@ -258,6 +265,12 @@ interface の項目を加えた。憲法の関門は案を現行の規則と 1 �
 `examples/llm-distributed/` と `examples/llm-replay/` の記録済みの案すべてに、
 同じ行を機械的に入れてある。案のほかの部分は変えておらず、再生の結果も変わらない。
 各ファイルの `edits` にこのことを記録している。
+
+2026-10-29 に、`DELIVERY_SLA` の期限と guarantee の行に契約の層の印
+（`# @amend:pickup_deadline`、`# @amend:dropoff_deadline`）を付け、2 か所のコメントを
+それに合わせて書き換えた。記録済みの案にも同じ印とコメントを機械的に入れた
+（`edits` に記録）。再生の結果は、`examples/llm-replay/` の 2 件目の案が止まる理由
+（集荷の期限の行だけを 180 秒にしたので、guarantee の行と値が食い違う）のほかは変わらない。
 
 ```bash
 python -m town.council --proposer replay --replay-dir examples/llm-distributed --mode DISTRIBUTED --rounds 2
@@ -291,6 +304,80 @@ to_central / to_distributed を動かしても結果は変わらない」と正�
 LLM の呼び出しには、安全分類器に断られたとき推奨のモデルで続ける
 サーバー側のフォールバック（`fallbacks: "default"`）を付けている。
 断られた・上限に達した・出力を読めないときは、その期は LLM の案なしとして続ける。
+
+## 人間が KPI を決め、LLM が提案する（town.steward）
+
+| 担い手 | すること | 残るもの |
+|---|---|---|
+| 人間 | `kpi.md` に KPI を自然言語で書く（`## 第 k 期から` の節で、期ごとに変えてよい）。LLM の判断要求に答え、理由を自然言語（`reason`）か GSN（`gsn:`）で残す | `answers.yaml`、`decisions.md`、`gsn.yaml`（図は `gsn.md`） |
+| LLM | KPI を測り方（`town/kpi.py` の指標の組み合わせ）に言い換える。KPI に向けて、規則・規制・契約の改正案を出す。決めきれないことを判断要求にまとめる（`town/llm_steward.py`） | `llm/p<k>-kpi.json`、`p<k>-propose.json`、`p<k>-request.json` |
+| 機械の関門 | 検査・憲法・同じシードで測った改善・投票（`town.council` と同じ）。LLM の申告は信用しない | `p<k>-evidence.md`、`v<k>.cadl`、`constitution-v<k>.yaml` |
+
+改正の層は 3 つ（`constitution.yaml` の `layer` と `regulation`）。
+
+| 層 | 対象 | 採否 |
+|---|---|---|
+| 規則 | `ROAD_USE`、運用モードの切替 | 関門をすべて通れば自動で採択できる。切替のしきい値（`safety: true`）は人間が決める |
+| 契約 | `DELIVERY_SLA`（集荷と配達の約束の秒数） | 顧客は投票に加わらないので、人間が決める |
+| 規制 | 憲法の不変条件と定足数 | 人間が決める |
+
+次のどれかに当たる案があると、自動では採択せず、LLM が判断要求を書いて人間の答えを待つ（`town/steward.py` の `triage()`）。
+
+| 理由 | 当たるとき |
+|---|---|
+| 合意 | KPI はよくなるのに投票で否決され、自動で採択できる案より KPI がよい |
+| 契約・規制・安全 | 契約の層、規制、運用モードの切替を変える（契約と安全は、KPI がよくなり不変条件を守るときだけ。KPI がよくならない契約の案は、LLM が判断を求めたときだけ人間に届く） |
+| KPI の衝突 | 主目標はよくなるが、KPI の条件を破るか、見張っている目標が悪化する |
+| 不確か | 関門はすべて通るが、改善したシードが 8 割に満たない |
+| LLM | LLM 自身が、人間の判断が要ると書いた（憲法の不変条件を守る案に限る） |
+
+KPI が変わったときも、読み方が分かれる・代理指標の恐れがある・過去の判断の前提が崩れる、
+のどれかなら、LLM が選択肢を添えて人間に確かめる。`--lang en` で、人間に見せる文言と LLM が
+書く文章が英語になる（KPI は `kpi.en.md`、見出しは `## From period k`）。
+
+```bash
+python -m town.steward --mode DISTRIBUTED --rounds 6 --name kpi-d             # LLM を呼ぶ。判断要求には端末で答える
+python -m town.steward --mode DISTRIBUTED --rounds 6 --name kpi-d \
+    --llm replay --replay-dir examples/steward-d --answers examples/steward-d/answers.yaml
+python -m town.steward --lang en --mode DISTRIBUTED --rounds 6 --name kpi-d-en \
+    --llm replay --replay-dir examples/steward-d-en --answers examples/steward-d-en/answers.yaml
+```
+
+端末がなく、`--answers` にも答えがないときは、判断要求を `runs/<名前>/p<k>-request.md` に
+書き出して止まる。答えを YAML に書き、同じ `--name` のまま `--answers <YAML>` を足して同じ
+コマンドを実行すると、`runs/<名前>/llm/` に記録のある LLM の出力は呼び直さずに続く。
+記録には依頼の要約（`request_digest`）が入っており、再生のときに依頼が記録と違えば
+（`kpi.md`、規則、これまでの判断が変わったなど）、「注意：記録したときと依頼の内容が違う」と出る。
+
+### 実際の LLM の記録（examples/steward-d、6 期）
+
+`examples/` の次の記録は、2026-10-29〜30 に Claude Opus 5.5 で実際に回したもの。判断要求への
+答え（`answers.yaml`）は、記録を作るときに人間（運営者）の役を Claude が務めて書いた。
+
+| 記録 | 内容 |
+|---|---|
+| `steward-d/` | `kpi.md`（日本語）で 6 期。入力約 61,600・出力約 52,800 トークン |
+| `steward-d-en/` | `kpi.en.md`（英語）で 6 期。入力約 60,600・出力約 52,200 トークン |
+| `steward-goodhart/proxy/`、`guarded/` | 代理指標の KPI（`kpi.md`）に、件数と定時配達だけを測る答えと、見張りを加える答えで 1 期ずつ |
+| `steward-goodhart/en/` | 同じ KPI を英語で（`kpi.en.md`）1 期 |
+
+| 期 | 判断を求めた理由（日本語の記録） | LLM の推奨 | 人間の選択 | 結果 |
+|---|---|---|---|---|
+| 1（平常） | 合意（`block_k 3 → 2` を B・C 社が否決） | keep | 否決を覆して `block_k 3 → 2` | v2 |
+| 2（平常＋ラッシュ） | 不確か（`block_k 2 → 1` が改善したシードは 2/5）、LLM | keep | 変えない | v2 |
+| 3（繁忙期） | なし（`hold_limit 60s → 50s` は +0.6 で、誤差の目安に届かない） | — | — | v2（自動） |
+| 4（繁忙期＋ラッシュ） | なし（LLM が案を出さない） | — | — | v2（自動） |
+| 5（閑散期、KPI が変わる） | 合意と KPI の衝突（`block_k 2 → 3`）、LLM（罰点をなくして差を縮める案） | `hold_limit 60s → 70s` | `hold_limit 60s → 70s` | v3 |
+| 6（閑散期） | KPI の衝突（`hold_limit 70s → 80s` で各社の定時率の差が 0.02 から 0.05 に） | keep | 変えない | v3 |
+
+- 英語の記録も、人間の答えをそろえたので 6 期の結果は同じ。英語の LLM は第 1 期に規制の案
+  （憲法の定時率の下限 0.6 → 0.65）を出して、否決を覆す代わりにそれを勧めた。
+- 日本語の第 1 期の判断要求は、表の列を足したあと同じ数値で依頼し直した。推奨は 1 回目が採る、
+  2 回目が変えないだった。
+- 第 2 期に、LLM は A・B 社の賛成で定足数に届く案を「C 社の反対を覆して」と書いた。判断要求の
+  依頼に憲法を渡していないので、LLM は定足数を知らない（LLM も知らないことに挙げている）。
+- 代理指標の KPI では、件数だけを測る答えでも、LLM は規則を緩める案を出さなかった（KPI の
+  「きちんと守らせたい」と逆だと書いた）。英語の LLM は、件数だけを測る選択肢を出さなかった。
 
 ## 制約と、まだないもの
 
