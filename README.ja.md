@@ -360,7 +360,7 @@ python -m town.steward --lang en --mode DISTRIBUTED --rounds 6 --name kpi-d-en \
 |---|---|
 | `steward-d/` | `kpi.md`（日本語）で 6 期。入力約 61,600・出力約 52,800 トークン |
 | `steward-d-en/` | `kpi.en.md`（英語）で 6 期。入力約 60,600・出力約 52,200 トークン |
-| `steward-goodhart/proxy/`、`guarded/` | 代理指標の KPI（`kpi.md`）に、件数と定時配達だけを測る答えと、見張りを加える答えで 1 期ずつ |
+| `steward-goodhart/proxy/`、`guarded/` | 代理指標の KPI（`kpi.md`）に、件数と定時配達だけを測る答えと、監視する目標を加える答えで 1 期ずつ |
 | `steward-goodhart/en/` | 同じ KPI を英語で（`kpi.en.md`）1 期 |
 
 | 期 | 判断を求めた理由（日本語の記録） | LLM の推奨 | 人間の選択 | 結果 |

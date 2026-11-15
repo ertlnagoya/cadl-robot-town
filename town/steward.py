@@ -220,7 +220,7 @@ def table(cur: dict, cur_vals: dict, cands: list[Cand], spec: dict) -> str:
     primary = spec["goals"][0]["metric"]
     head = M("t_head", metric=primary)
     utils = lambda m: " / ".join(f"{m['companies'][x]['utility']:.1f}" for x in sorted(m["companies"]))
-    # 見張る目標と KPI の条件の指標は、値を 1 列にまとめて見せる（表の固定の列にないものも）
+    # 監視する目標と KPI の条件の指標は、値を 1 列にまとめて見せる（表の固定の列にないものも）
     watch = list(dict.fromkeys([g["metric"] for g in spec["goals"][1:]]
                                + [g["metric"] for g in spec.get("guards") or []]))
     fmt_v = lambda n, x: f"{x:.2f}" if n.endswith("rate") or n == "on_time_rate_gap" else f"{x:.1f}"
