@@ -239,7 +239,7 @@ MSG = {
     },
 }
 
-# town.council の関門の理由（日本語）を英語にする
+# town.council の判定の理由（日本語）を英語にする
 GATE_EN = [
     (r"^@amend 行の数値以外を書き換えている$", "changes more than the numbers on @amend lines"),
     (r"^何も変えていない$", "changes nothing"),

@@ -13,7 +13,7 @@
 | ループ | 目標を決めるのは | 改正案を出すのは | 決めきれないことは |
 |---|---|---|---|
 | `town.steward`（[後述](#人間が-kpi-を決めllm-が提案するtownsteward)） | 人間が自然言語で書く KPI（`kpi.md` か `kpi.en.md`、期ごとに変えてよい） | LLM（規則・規制・契約） | LLM が判断要求にまとめ、人間が答えて、理由を自然言語か GSN で残す |
-| `town.council` | `constitution.yaml` の `objective`（固定） | ルールベースの探索、または LLM（規則だけ） | 関門で機械的に決まる（否決されれば採らない） |
+| `town.council` | `constitution.yaml` の `objective`（固定） | ルールベースの探索、または LLM（規則だけ） | 判定で機械的に決まる（否決されれば採らない） |
 
 - 規範の判定（期限・監視・状態遷移）は、コース A と同じ Python 参照
   ランタイム（`town/contract_engine.py`）が IR を読んで行う。
@@ -71,7 +71,7 @@ python -m town.council --mode DISTRIBUTED --rounds 6 # 6 期
 
 改正案は `constitution.yaml` の `amendable` にあるパラメータ（CADL の
 `# @amend:<名前>` 行）を 1 つだけ 1 ステップ動かしたもの。検査・憲法・
-改善・投票の 4 つの関門を通った案のうち、目標が最もよくなる案を採択する。
+改善・投票の 4 つの判定を通った案のうち、目標が最もよくなる案を採択する。
 
 ```text
 === 第 1 期（平常：注文の平均間隔 75 秒）  現行 v1: sanction_lambda=0.5, hold_limit=60, block_k=3, to_central=22, to_distributed=26 ===
@@ -222,9 +222,9 @@ python -m town.period --rush 1200 2400 25 --no-quiescence
 定時率・罰点・効用、原因別の違反）、これまでの改正履歴、憲法、現行の規則を
 渡し、改正後の規則ファイル全体を最大 3 案返させる（`town/llm_council.py`）。
 LLM が「何を変えたか」をどう申告しても信用せず、返ってきた CADL を、
-ルールベースの案と同じ関門にかける。
+ルールベースの案と同じ判定にかける。
 
-| 関門 | 判定 | LLM の案で起こりうること |
+| 判定 | 条件 | LLM の案で起こりうること |
 |---|---|---|
 | 検査 | `cadl check` / `cadl sim-ir` を通り、街を動かす値が IR にそろう | 書式の誤り、期限を「1 minute」と書くなど |
 | 憲法（文面） | 変えたのが `@amend` 行の数値だけで、1 パラメータ 1 ステップ。委員会が変えてよいのは規則の層だけ | 契約の層（顧客への配達期限）に手を出す、一度に大きく動かす |
@@ -238,7 +238,7 @@ python -m town.council --proposer llm --check      # LLM を呼ばず、配線�
 ```
 
 LLM の案は `runs/<名前>/llm-round<k>.json` に保存され、`--proposer replay` で
-LLM を呼ばずに再生できる。`examples/llm-replay/llm-round1.json` は、関門の
+LLM を呼ばずに再生できる。`examples/llm-replay/llm-round1.json` は、判定の
 働きを見せるために手で書いた見本（LLM の出力ではない）。
 
 ```bash
@@ -252,7 +252,7 @@ python -m town.council --proposer replay --replay-dir examples/llm-replay --mode
   集荷の期限を 120 秒から 180 秒に延ばす                     -     -      -          -    ○    ×    -    -     pickup_deadline の行どうしで値が食い違う（120, 180）
   [3] hold_limit を「1 minute」と書き直す
   hold_limit を「1 minute」と書き直す                  -     -      -          -    ×    -    -    -     Type check failed: 1 error(s), 0 warning(s)
-  → 採択なし（すべての案がどこかの関門で止まった）。規則は変わらない。
+  → 採択なし（すべての案がどこかの判定で除かれた）。規則は変わらない。
 ```
 
 ### 実際の LLM の案（分散モードに固定、2 期）
@@ -262,7 +262,7 @@ python -m town.council --proposer replay --replay-dir examples/llm-replay --mode
 
 2026-10-19 に、初期の規則の AMEND に 2 つのステップ（`TOWN_STEWARD -> COUNCIL :
 violation_report`、`COUNCIL -> TOWN_STEWARD : rule_update`）と、それに合わせた
-interface の項目を加えた。憲法の関門は案を現行の規則と 1 行ずつ比べるので、
+interface の項目を加えた。憲法の判定は案を現行の規則と 1 行ずつ比べるので、
 `examples/llm-distributed/` と `examples/llm-replay/` の記録済みの案すべてに、
 同じ行を機械的に入れてある。案のほかの部分は変えておらず、再生の結果も変わらない。
 各ファイルの `edits` にこのことを記録している。
@@ -312,14 +312,14 @@ LLM の呼び出しには、安全分類器に断られたとき推奨のモデ�
 | 担い手 | すること | 残るもの |
 |---|---|---|
 | 人間 | `kpi.md` に KPI を自然言語で書く（`## 第 k 期から` の節で、期ごとに変えてよい）。LLM の判断要求に答え、理由を自然言語（`reason`）か GSN（`gsn:`）で残す | `answers.yaml`、`decisions.md`、`gsn.yaml`（図は `gsn.md`） |
-| LLM | KPI を測り方（`town/kpi.py` の指標の組み合わせ）に言い換える。KPI に向けて、規則・規制・契約の改正案を出す。決めきれないことを判断要求にまとめる（`town/llm_steward.py`） | `llm/p<k>-kpi.json`、`p<k>-propose.json`、`p<k>-request.json` |
-| 機械の関門 | 検査・憲法・同じシードで測った改善・投票（`town.council` と同じ）。LLM の申告は信用しない | `p<k>-evidence.md`、`v<k>.cadl`、`constitution-v<k>.yaml` |
+| LLM | KPI を評価方法（`town/kpi.py` の指標の組み合わせ）に言い換える。KPI に向けて、規則・規制・契約の改正案を出す。決めきれないことを判断要求にまとめる（`town/llm_steward.py`） | `llm/p<k>-kpi.json`、`p<k>-propose.json`、`p<k>-request.json` |
+| 機械による判定 | 検査・憲法・同じシードで測った改善・投票（`town.council` と同じ）。LLM の申告は信用しない | `p<k>-evidence.md`、`v<k>.cadl`、`constitution-v<k>.yaml` |
 
 改正の層は 3 つ（`constitution.yaml` の `layer` と `regulation`）。
 
 | 層 | 対象 | 採否 |
 |---|---|---|
-| 規則 | `ROAD_USE`、運用モードの切替 | 関門をすべて通れば自動で採択できる。切替のしきい値（`safety: true`）は人間が決める |
+| 規則 | `ROAD_USE`、運用モードの切替 | 判定をすべて通れば自動で採択できる。切替のしきい値（`safety: true`）は人間が決める |
 | 契約 | `DELIVERY_SLA`（集荷と配達の約束の秒数） | 顧客は投票に加わらないので、人間が決める |
 | 規制 | 憲法の不変条件と定足数 | 人間が決める |
 
@@ -330,7 +330,7 @@ LLM の呼び出しには、安全分類器に断られたとき推奨のモデ�
 | 合意 | KPI はよくなるのに投票で否決され、自動で採択できる案より KPI がよい |
 | 契約・規制・安全 | 契約の層、規制、運用モードの切替を変える（契約と安全は、KPI がよくなり不変条件を守るときだけ。KPI がよくならない契約の案は、LLM が判断を求めたときだけ人間に届く） |
 | KPI の衝突 | 主目標はよくなるが、KPI の条件を破るか、監視している目標が悪化する |
-| 不確か | 関門はすべて通るが、改善したシードが 8 割に満たない |
+| 不確か | 判定はすべて通るが、改善したシードが 8 割に満たない |
 | LLM | LLM 自身が、人間の判断が要ると書いた（憲法の不変条件を守る案に限る） |
 
 KPI が変わったときも、読み方が分かれる・代理指標の恐れがある・過去の判断の前提が崩れる、
@@ -387,8 +387,8 @@ python -m town.steward --lang en --mode DISTRIBUTED --rounds 6 --name kpi-d-en \
   隣の案として次の期に評価されるだけ）。
 - 目標を `--objective violations`（配達の遅れも含む違反全体）にすると、
   暴走は起きない。遅配が違反として数えられ、目標が街の良さとずれないため。
-- LLM の見立てや理由の中の事実の誤り（例：A 社の遅配がすべて集荷の遅れだと
-  断定する。観測からはそこまで言えない）は、関門では検査していない。
+- LLM の所見や理由の中の事実の誤り（例：A 社の遅配がすべて集荷の遅れだと
+  断定する。観測からはそこまで言えない）は、判定では検査していない。
 - Unity・実機での再生はまだない。
 - CADL 仕様の課題として見つかったもの：
   - `cadl` 0.3.31 の `sim-ir` も `sos.transitions[*].safety_invariant` を IR に

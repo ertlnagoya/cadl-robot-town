@@ -8,7 +8,7 @@
     python -m town.council --proposer replay --replay-dir examples/llm-replay
                                                          # 保存した LLM の案を再生する
 
-1 期ごとに、次の 4 つの関門を順に通った改正案だけを採択する。
+1 期ごとに、次の 4 つの判定を順に通った改正案だけを採択する。
 
   1. 検査   ：cadl check / cadl sim-ir を通る
   2. 憲法   ：変えたのが @amend 行の数値だけで、1 パラメータ 1 ステップの範囲内。
@@ -21,7 +21,7 @@
 - neighbors（既定）：amendable のパラメータを 1 つだけ 1 ステップ動かした案をすべて試す
 - llm：LLM が観測を読んで改正案（CADL ファイル全体）を書く（town/llm_council.py）
 - replay：--replay-dir に保存した LLM の案を再生する
-比較は同じ乱数シードで行う。採択された規則は runs/<名前>/ に版として残る。
+比較は同じ乱数シードで行う。採択された規則は runs/<名前>/ にバージョンとして残る。
 
 第 k 期の環境（需要）は scenario.yaml の periods[k-1] で決まる。現行の
 規則も、その期の環境で評価し直してから改正案と比べる。
@@ -105,7 +105,7 @@ def _canonical(text: str) -> list[str]:
 
 def check_amendment(cur_text: str, cand_text: str, amendable: dict,
                     layers: tuple[str, ...] = ("rule",)) -> tuple[bool, str]:
-    """憲法の文面の関門：@amend 行の数値以外を変えていないか、変え方が範囲内か。
+    """憲法の文面の判定：@amend 行の数値以外を変えていないか、変え方が範囲内か。
     layers は、変えてよい層（委員会は規則の層だけ）。"""
     if _canonical(cur_text) != _canonical(cand_text):
         return False, "@amend 行の数値以外を書き換えている"
@@ -235,7 +235,7 @@ def main() -> int:
                 proposals, note, view = llm_council.replay(args.replay_dir / f"llm-round{rnd}.json")
             print(f"  LLM の委員会: {note}、{len(proposals)} 件")
             if view:
-                print(f"  見立て: {view}")
+                print(f"  所見: {view}")
         print("  改正案                                  定時配達  違反 (道路) ふさがれた  検査 憲法 改善 投票(A B C)")
         best = None
         for i, prop in enumerate(proposals, 1):
@@ -270,7 +270,7 @@ def main() -> int:
                 best = (gain, cand_text, cand_ir, m, votes)
 
         if best is None:
-            print("  → 採択なし（すべての案がどこかの関門で止まった）。規則は変わらない。")
+            print("  → 採択なし（すべての案がどこかの判定で除かれた）。規則は変わらない。")
             history.append(f"- 第 {rnd} 期（{env['label']}）: 採択なし\n")
             continue
         gain, new_text, ir, cur, votes = best
@@ -285,10 +285,10 @@ def main() -> int:
         history.append(f"- 第 {rnd} 期（{env['label']}）: v{version} {label}"
                        f"（目標 {gain:+.1f}，賛成 {yes}）\n")
 
-    for f in run_dir.glob("round*.cadl"):          # 不採択の案は消し、版だけを残す
+    for f in run_dir.glob("round*.cadl"):          # 不採択の案は消し、採択したバージョンだけを残す
         f.unlink()
     (run_dir / "history.md").write_text("".join(history), encoding="utf-8")
-    print(f"\n版と履歴: {run_dir.relative_to(ROOT)}/  （v1.cadl 〜 v{version}.cadl, history.md）")
+    print(f"\nバージョンと履歴: {run_dir.relative_to(ROOT)}/  （v1.cadl 〜 v{version}.cadl, history.md）")
     return 0
 
 
