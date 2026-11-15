@@ -1,57 +1,87 @@
 {
-  "note": "claude-opus-5-5、入力 2391 / 出力 1588 トークン",
-  "request_digest": "6956009e5df6f232",
+  "note": "claude-opus-5-5、入力 2394 / 出力 2110 トークン",
+  "request_digest": "8c2e581b94510f90",
   "data": {
-    "interpretation": "The operator wants road rules to be obeyed, measured by road-rule violations (release deadline overruns and blocking_guard evictions), pushed as low as possible. The stated target is a count of violations. That count is a proxy for the real aim, which is orderly, unobstructed road use. It can be lowered in ways that do not serve that aim: loosening or removing the rules so fewer events count as violations, or making robots move or deliver less.",
+    "interpretation": "The KPI asks that the road rules be followed and that road-rule violations (release deadline overruns and blocking_guard evictions) be reduced as far as possible. This maps directly to road_violations, not violation_total, which also counts late deliveries. However, road_violations is a proxy for safe, orderly road use. It can be lowered in ways that defeat the intent: rules could be loosened so that fewer events count as violations, or robots could move less or hold back deliveries. Reading 'make sure the rules are kept' as a hard zero-violation requirement is also possible. Each reading needs a different evaluation, so the human should choose.",
     "options": [
       {
-        "label": "Minimize road violations, watching that road use and service do not get worse",
+        "label": "Minimize road violations only",
         "goals": [
           {
             "metric": "road_violations",
-            "text": "Reduce the number of road-rule violations (release overruns and blocking_guard evictions)."
+            "text": "Primary: reduce the number of road-rule violations (release overruns and blocking_guard evictions)."
           },
           {
             "metric": "blocked_s",
-            "text": "Watch that total time robots spend blocked does not grow, so fewer violations reflects better road use and not just fewer counted events."
+            "text": "Watch: total time robots are blocked by stopped robots should not get worse."
+          }
+        ],
+        "guards": [],
+        "note": "Closest to the literal KPI. It does not protect delivery performance, so an amendment that cuts violations by slowing or suppressing deliveries, or by loosening rule definitions, could be adopted."
+      },
+      {
+        "label": "Minimize road violations while protecting delivery service",
+        "goals": [
+          {
+            "metric": "road_violations",
+            "text": "Primary: reduce the number of road-rule violations."
+          },
+          {
+            "metric": "blocked_s",
+            "text": "Watch: blocked time should not increase. This catches rule loosening that hides real obstruction."
           },
           {
             "metric": "on_time_deliveries",
-            "text": "Watch that town-wide on-time deliveries do not fall, so violations are not cut by making robots do less."
+            "text": "Watch: town-wide on-time deliveries should not drop."
           },
           {
             "metric": "unfinished",
-            "text": "Watch that orders left undelivered at period end do not increase."
+            "text": "Watch: orders left undelivered at period end should not increase."
           }
         ],
-        "guards": [],
-        "note": "Follows the KPI wording literally, with watch goals that catch the two main ways the count can be gamed. No numeric guards are set because baseline values are not yet known. Once the current seed has been measured, the operator may want hard guards such as on_time_deliveries >= baseline."
+        "guards": [
+          {
+            "metric": "min_company_on_time_rate",
+            "op": ">=",
+            "value": 0.8,
+            "text": "No company's on-time rate may fall below 80% after the amendment. This prevents violations being cut by sacrificing one company's service. The threshold is a placeholder and should be set from the measured baseline."
+          }
+        ],
+        "note": "Recommended. Improvement is still measured by road_violations, but the amendment cannot pass by hiding obstruction or by sacrificing deliveries. The 0.8 guard value is a placeholder and should be replaced with the current baseline value."
       },
       {
-        "label": "Minimize actual obstruction, keeping the violation count as a watch",
+        "label": "Zero road violations as a hard requirement",
         "goals": [
           {
-            "metric": "blocked_s",
-            "text": "Reduce total time robots are blocked by stopped robots, which is the harm the road rules exist to prevent."
+            "metric": "road_violations",
+            "text": "Primary: drive road-rule violations down, with zero as the required end state."
           },
           {
-            "metric": "road_violations",
-            "text": "Watch that road-rule violations do not increase."
+            "metric": "blocked_s",
+            "text": "Watch: blocked time should not increase."
           },
           {
             "metric": "on_time_deliveries",
-            "text": "Watch that town-wide on-time deliveries do not fall."
+            "text": "Watch: on-time deliveries should not drop."
           }
         ],
-        "guards": [],
-        "note": "Reads 'make sure the road rules are kept' as aimed at the purpose of the rules (unobstructed roads). Choosing this means a change that cuts blocking but leaves the violation count flat would still count as an improvement."
+        "guards": [
+          {
+            "metric": "road_violations",
+            "op": "<=",
+            "value": 0,
+            "text": "After the amendment there must be no road-rule violations at all."
+          }
+        ],
+        "note": "Reads 'make sure the road rules are kept' as an absolute requirement. This may reject every realistic amendment if zero is not reachable in one step, and it creates strong pressure to loosen the rules themselves."
       }
     ],
-    "recommended": 1,
+    "recommended": 2,
     "concerns": [
-      "road_violations is defined by the rules themselves. A ROAD_USE amendment that lengthens release deadlines or weakens or removes blocking_guard would lower the count without making robots behave better. The operator should decide whether loosening the rules counts as 'keeping' them, or whether only stricter or equal rules are acceptable.",
-      "Violations can also be reduced by having robots travel or deliver less, for example through more conservative operating modes. This would hurt service. Option 1 only watches for this; the operator may want hard guards on on_time_deliveries or unfinished once a baseline is measured.",
-      "The KPI says 'as much as possible' with no limit on what may be traded away. If cutting violations conflicts with on-time delivery or fairness between companies, the operator needs to say how much service loss, if any, is acceptable."
+      "road_violations is a proxy. Because the road rules themselves (ROAD_USE) can be amended, an amendment could lower the count by loosening release deadlines or blocking_guard conditions, without making the roads any less obstructed. Watching blocked_s helps detect this.",
+      "Violations can also be reduced by robots moving less, yielding excessively, or delaying pickups, which would hurt deliveries. The KPI says nothing about delivery service, so it is unclear whether that trade-off is acceptable.",
+      "'Make sure the road rules are kept' could mean a hard zero-violation requirement rather than 'as few as possible'. These lead to different evaluations: option 3 versus options 1 and 2.",
+      "The guard threshold in option 2 (minimum company on-time rate 0.8) is a placeholder. It should be set from the measured baseline before use."
     ],
     "revisit": []
   }
