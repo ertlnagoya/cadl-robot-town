@@ -1,133 +1,113 @@
 {
-  "note": "claude-opus-5-5、入力 2993 / 出力 2910 トークン",
-  "request_digest": "390976e714b96b88",
+  "note": "claude-opus-5-5、入力 2940 / 出力 2856 トークン",
+  "request_digest": "ad29bd722d60ccf8",
   "data": {
-    "interpretation": "From period 5 the KPI has two parts. Fairness comes first: road use should not make any one company better or worse off. On-time delivery remains a goal, but a secondary one. 'Gain or lose because of how the road is used' fits utility_gap best. Utility is on-time deliveries minus sanctions, and road rules affect both. on_time_rate_gap is a narrower reading that looks only at customer-facing results. The KPI could also mean that no company should end up worse off than it is now. No available metric measures that directly, so it is listed as a concern. Orders are falling, so counts will be smaller and rates noisier than in periods 1–4.",
+    "interpretation": "From period 5 the KPI shifts emphasis. On-time delivery still matters, but the leading concern ('but ... no single company should gain or lose') is fairness between companies under the road rules. 'Gain or lose' is best measured by company utility (on-time deliveries minus sanctions), because road rules affect both deliveries and sanctions. 'Still matters' reads as a floor and a watched goal, not the main goal. Because orders fall in the quiet season, absolute counts shrink, so guards should use rates rather than counts. The KPI can be read in different ways, so I offer three evaluation methods for the human to choose from.",
     "options": [
       {
-        "label": "Fairness of utility first, on-time delivery watched",
+        "label": "Fairness of utility first, on-time as a floor",
         "goals": [
           {
             "metric": "utility_gap",
-            "text": "Shrink the difference in utility (on-time deliveries minus sanctions) between the best-off and worst-off company"
+            "text": "Decrease the gap between the best and worst company's utility (on-time deliveries minus sanctions)."
+          },
+          {
+            "metric": "min_company_on_time_rate",
+            "text": "Watch that the worst company's on-time rate does not fall."
           },
           {
             "metric": "on_time_deliveries",
-            "text": "Watch that town-wide on-time deliveries do not fall"
-          },
-          {
-            "metric": "on_time_rate_gap",
-            "text": "Watch that the spread of on-time rates between companies does not widen"
+            "text": "Watch that town-wide on-time deliveries do not fall."
           },
           {
             "metric": "sanction_total",
-            "text": "Watch that total sanctions do not rise, so the gap is not closed by penalising everyone"
+            "text": "Watch that total sanctions do not rise, so the gap does not narrow simply by penalising everyone."
           }
         ],
         "guards": [
           {
             "metric": "min_company_on_time_rate",
             "op": ">=",
-            "value": 0.8,
-            "text": "No company's on-time rate may fall below 0.8 (kept from K1)"
-          },
-          {
-            "metric": "unfinished",
-            "op": "<=",
-            "value": 3,
-            "text": "At most 3 orders left undelivered at the end of the period (kept from K1)"
+            "value": 0.7,
+            "text": "Every company keeps at least a 70% on-time rate (the provisional floor carried over from K1)."
           }
         ],
-        "note": "Closest to 'no single company should gain or lose because of how the road is used'. Utility includes sanctions, and road rules directly cause sanctions, so road-driven advantages show up here. Recommended."
+        "note": "Closest to 'gain or lose'. Utility covers both deliveries and penalties, and both depend on road rules. Risk: the gap can shrink by levelling down, which is why the monitored goals and the floor are included."
       },
       {
-        "label": "Fairness of on-time rates first",
+        "label": "Fairness of on-time rate first",
         "goals": [
           {
             "metric": "on_time_rate_gap",
-            "text": "Shrink the gap between the highest and lowest company on-time rate"
-          },
-          {
-            "metric": "on_time_deliveries",
-            "text": "Watch that town-wide on-time deliveries do not fall"
+            "text": "Decrease the gap between the best and worst company's on-time rate."
           },
           {
             "metric": "utility_gap",
-            "text": "Watch that the utility gap between companies does not widen"
+            "text": "Watch that the utility gap does not widen."
           },
           {
-            "metric": "min_company_on_time_rate",
-            "text": "Watch that the worst company's on-time rate does not fall"
+            "metric": "on_time_deliveries",
+            "text": "Watch that town-wide on-time deliveries do not fall."
           }
         ],
         "guards": [
           {
             "metric": "min_company_on_time_rate",
             "op": ">=",
-            "value": 0.8,
-            "text": "No company's on-time rate may fall below 0.8"
-          },
-          {
-            "metric": "unfinished",
-            "op": "<=",
-            "value": 3,
-            "text": "At most 3 orders left undelivered at the end of the period"
+            "value": 0.7,
+            "text": "Every company keeps at least a 70% on-time rate."
           }
         ],
-        "note": "Reads fairness as customer-facing service quality per company and ignores sanctions. The gap may also reflect differences in where customers are or how many orders each company gets, not only road use. With few orders, the gap will be noisy."
+        "note": "Measures fairness as the service customers receive, ignoring sanctions. A rate is less sensitive to falling order volume than counts are. However, it misses gains or losses that come from sanctions."
       },
       {
-        "label": "On-time delivery first, fairness watched",
+        "label": "On-time deliveries first, fairness as hard limits",
         "goals": [
           {
             "metric": "on_time_deliveries",
-            "text": "Increase town-wide on-time deliveries"
+            "text": "Increase town-wide on-time deliveries."
           },
           {
             "metric": "utility_gap",
-            "text": "Watch that the utility gap between companies does not widen"
-          },
-          {
-            "metric": "on_time_rate_gap",
-            "text": "Watch that the on-time rate gap does not widen"
+            "text": "Watch that the utility gap does not widen."
           },
           {
             "metric": "late_deliveries",
-            "text": "Watch that late deliveries do not rise"
+            "text": "Watch that late deliveries do not rise."
           }
         ],
         "guards": [
           {
-            "metric": "min_company_on_time_rate",
-            "op": ">=",
-            "value": 0.8,
-            "text": "No company's on-time rate may fall below 0.8"
+            "metric": "on_time_rate_gap",
+            "op": "<=",
+            "value": 0.1,
+            "text": "Company on-time rates differ by at most 10 percentage points."
           },
           {
-            "metric": "unfinished",
-            "op": "<=",
-            "value": 3,
-            "text": "At most 3 orders left undelivered at the end of the period"
+            "metric": "min_company_on_time_rate",
+            "op": ">=",
+            "value": 0.7,
+            "text": "Every company keeps at least a 70% on-time rate."
           }
         ],
-        "note": "Keeps period 1–4 priorities and treats fairness only as something to watch. This underweights the new KPI's stated reason ('to keep the companies cooperating'). Choose it only if fairness is meant as a side condition."
+        "note": "Keeps the previous main goal and treats fairness only as limits. This fits the wording 'still matters' less well, and in a quiet season the gains in absolute counts will be small."
       }
     ],
     "recommended": 1,
     "concerns": [
-      "A gap metric can be improved by levelling down: making the best-off company worse instead of helping the worst-off one. Option 1 watches on_time_deliveries and sanction_total to catch this, but a watched goal is not a hard limit.",
-      "'No company should gain or lose' may mean no company ends up worse off than under the current rules. No available metric measures each company's change against today. utility_gap and the company vote only partly cover it. A human should confirm whether a rule change that narrows the gap but lowers one company's utility is acceptable.",
-      "utility_gap also counts sanctions for late deliveries, which can come from demand or customer location rather than road use. on_time_rate_gap has the same problem. Neither metric isolates the road's effect alone.",
-      "Orders are falling, so per-company rates and gaps rest on few deliveries and will vary more across seeds. The K1 floors (min_company_on_time_rate >= 0.8, unfinished <= 3) were set in the busy season. They may now be too easy (unfinished) or too strict and noisy (a single late order can move a company's rate a lot)."
+      "The KPI says no company should gain or lose 'because of how the road is used', but utility_gap and on_time_rate_gap measure total differences between companies. Those differences also reflect each company's own demand and fleet use, so the gap metrics are only proxies for the rule-caused effect.",
+      "Narrowing a gap can be achieved by making the best company worse off rather than helping the worst one. This would meet the metric but break 'no single company should ... lose'. Monitored goals and a floor reduce this risk but do not remove it.",
+      "On-time delivery and fairness can conflict. A rule that raises town-wide on-time deliveries may shift utility between companies, as D1 did when C's utility fell from 28.8 to 19.0.",
+      "Orders fall in the quiet season, so count-based figures (on_time_deliveries, late_deliveries, sanction_total) are not comparable with periods 1–4. The 0.7 floor was explicitly provisional in K1, and measured worst-company rates have been around 0.98, so the floor may be too loose to protect anyone."
     ],
     "revisit": [
       {
         "decision": "K1",
-        "why": "K1 made town-wide on-time deliveries the main goal. The new KPI puts fairness between companies first and on-time delivery second, so the main goal and its guards need to be chosen again."
+        "why": "K1's reading (town-wide on-time deliveries as the main goal) is replaced by a KPI that puts fairness between companies first. Its 0.7 floor was provisional and should be reset in light of measured rates and the quiet season."
       },
       {
         "decision": "D1",
-        "why": "D1 (block_k 3 → 2) was adopted against B's and C's votes, and C's utility fell from 28.8 to 19.0. The new KPI says no company should lose because of how the road is used. D1 should be re-measured on utility_gap and on C's utility, and possibly reconsidered. The re-measurement of C's utility and road violations promised in D1 should be done now."
+        "why": "D1 was adopted against B's and C's votes even though it cut C's utility from 28.8 to 19.0. Under the new KPI, a company losing utility because of a road rule is exactly what should be avoided. The human also asked for C's utility and road violations to be re-measured, so v2 block_k 3 → 2 should be re-evaluated against utility_gap."
       }
     ]
   }

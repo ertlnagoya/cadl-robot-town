@@ -1,4 +1,4 @@
-"""複数の版の規則を、同じ環境・同じシードで並べて比べる。
+"""複数のバージョンの規則を、同じ環境・同じシードで並べて比べる。
 
     python -m town.compare runs/goodhart/v1.cadl runs/goodhart/v6.cadl
     python -m town.compare runs/*/v*.cadl --interval 45 --seeds 1001 1002 1003

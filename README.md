@@ -141,30 +141,37 @@ record anyway.
 
 ### Real LLM records
 
-The following records come from real runs with Claude Opus 5.5 on 2026-10-29/30.
+The following records come from real runs with Claude Opus 5.5 on 2026-11-15 (cadl 0.3.31).
 The answers to the decision requests (`answers.yaml`) were written by Claude
 playing the human operator when the records were made.
 
 | Record | Contents |
 |---|---|
-| `examples/steward-d-en/` | six periods with `kpi.en.md` (English); about 60,600 input / 52,200 output tokens |
-| `examples/steward-d/` | the same in Japanese (`kpi.md`); about 61,600 / 52,800 tokens |
+| `examples/steward-d-en/` | six periods with `kpi.en.md` (English); about 59,400 input / 48,100 output tokens |
+| `examples/steward-d/` | the same in Japanese (`kpi.md`); about 69,300 / 67,700 tokens |
 | `examples/steward-goodhart/en/` | a proxy KPI ("reduce road-rule violations"), one period, in English |
 | `examples/steward-goodhart/proxy/`, `guarded/` | the same proxy KPI in Japanese, answered two ways |
 
-- Period by period: the vetoed `block_k 3 → 2` is adopted by the human against
-  the LLM's recommendation; an uncertain tightening is kept back; nothing is
-  proposed or adopted in the busy season; after the KPI changes to fairness,
-  the LLM flags "switch off sanctions" as a Goodhart pattern and the human
-  adopts `hold_limit 60s → 70s`; a further step that widens the spread of
-  on-time rates is kept back. Both languages end with the same outcomes.
-- In English the LLM also proposed a regulation (raise the constitution's
-  floor on on-time rates), which the Japanese run did not; in Japanese the
-  period-1 recommendation changed when the same request was sent again.
-- In period 2 the LLM did not know the quorum (the decision-request call is not
-  given the constitution) and listed that as unknown.
-- With the proxy KPI, the LLM proposed no loosening of the rules, and in English
-  did not offer a count-only measure at all.
+- Period by period (English): the vetoed `block_k 3 → 2` is adopted by the
+  human against the LLM's recommendation (a regulation); an uncertain tightening
+  is kept back; nothing is adopted in the busy season; after the KPI changes to
+  fairness, the LLM recommends switching off sanctions and the human adopts
+  `hold_limit 60s → 70s` instead; a further step that lowers the worst company's
+  on-time rate is kept back against the LLM's recommendation. The rules end at v3.
+- The Japanese run parts from the English one in period 3: the LLM proposes
+  `block_k 2 → 1` (5/5 seeds, but C's utility halves), which the human keeps
+  back; in period 4 the human adopts `hold_limit 60s → 50s` against C's vote, and
+  in period 5, under the fairness KPI, takes it back (`hold_limit 50s → 60s`,
+  all three companies for). The rules end at v4, with the same values as v2.
+- In periods 2 and 4 the LLM wrote of "B's and C's objection" to proposals that
+  B voted for, and listed the mismatch as unknown: the decision-request call is
+  not given the constitution, so the LLM does not know the quorum.
+- With the proxy KPI, the Japanese LLM proposed a loosening (`hold_limit 60s → 70s`,
+  fewer counted violations on 5/5 seeds, all three companies for), then flagged it
+  for the human, writing that the count falls because the threshold moved, not
+  because the rules are kept, and recommended keeping the rules. In neither language
+  did the LLM offer a measure that looks at the count alone; every option also
+  watched blocked time.
 
 On 2026-10-29 the rules file gained contract-layer tags on the `DELIVERY_SLA`
 deadlines and guarantees, and two comments changed to match; the same lines were

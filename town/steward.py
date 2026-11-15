@@ -7,25 +7,25 @@
 役割分担
 - 人間：kpi.md に、サービスの KPI を自然言語で書く（期ごとに変えてよい）。LLM の
   判断要求に答え、判断の理由を自然言語か GSN で残す。
-- LLM：KPI を測り方に言い換える。KPI に向けて、規則・規制・契約の改正案を出す。
+- LLM：KPI を評価方法に言い換える。KPI に向けて、規則・規制・契約の改正案を出す。
   明らかには判断できないことや、当事者が合意すべきことは、判断要求にまとめて
   人間に渡す（town/llm_steward.py）。
-- 機械の関門：検査・憲法・測った改善・投票（town.council と同じ）。LLM の申告は
+- 機械による判定：検査・憲法・測った改善・投票（town.council と同じ）。LLM の申告は
   信用せず、測った値だけを使う。
 
 1 期の流れ
-  1. kpi.md を読み直す。KPI が変わったら、LLM が測り方に言い換える。読み方が分かれる、
+  1. kpi.md を読み直す。KPI が変わったら、LLM が評価方法に言い換える。読み方が分かれる、
      代理指標の恐れがある、過去の判断の前提が崩れる、のどれかなら人間が選ぶ。
   2. 現行の規則を、この期の環境で測る。
-  3. LLM が改正案を出し、各案を関門にかけて測る。
-  4. 次のどれかに当たる案があれば、人間に判断を求める。なければ、関門をすべて通った
+  3. LLM が改正案を出し、各案を判定にかけて測る。
+  4. 次のどれかに当たる案があれば、人間に判断を求める。なければ、判定をすべて通った
      案のうち、KPI の主目標が最もよくなるものを自動で採択する。
      - 合意     ：KPI はよくなるのに投票で否決され、自動で採択できる案より KPI がよい
      - 契約     ：顧客との約束（DELIVERY_SLA）を変え、KPI がよくなる
      - 規制     ：憲法の値を変える
      - 安全     ：運用モードの切替の条件を変え、KPI がよくなる
      - KPI の衝突：主目標はよくなるが、KPI の条件を破るか、ほかの目標が悪化する
-     - 不確か   ：関門はすべて通るが、改善したシードが 8 割に満たない
+     - 不確か   ：判定はすべて通るが、改善したシードが 8 割に満たない
      - LLM      ：LLM 自身が、人間の判断が要ると書いた
   5. 判断と理由を decisions.md と gsn.yaml（図は gsn.md）に残し、次の期の LLM に渡す。
 
@@ -437,7 +437,7 @@ def main() -> int:
                 blk=cur_vals["blocked_s"], road=cur_vals["road_violations"], metric=primary,
                 val=cur_vals[primary]))
 
-        # 3. LLM が改正案を出し、関門にかけて測る
+        # 3. LLM が改正案を出し、判定にかけて測る
         req = llm_steward.propose_request(
             kpi_text, spec, MODE_NOTE[args.mode], env, _observation(cur), "".join(history),
             decisions_brief(log), revisit,
@@ -560,7 +560,7 @@ def main() -> int:
             gsn.add("justification", M("gsn_j_auto") if chosen else M("gsn_j_none"), s, by="tool")
         log.append({"id": f"D{k}", "period": k, "who": who, "summary": what,
                     "reason": (ans or {}).get("reason", "")})
-        for f in run_dir.glob(f"p{k}-*.cadl"):          # 不採択の案は消し、版だけを残す
+        for f in run_dir.glob(f"p{k}-*.cadl"):          # 不採択の案は消し、採択したバージョンだけを残す
             f.unlink()
         finish()
 

@@ -1,4 +1,4 @@
-"""1 期（既定 1 時間）を、規則ファイル 1 つで、複数の乱数シードについて回す。
+"""1 期（既定 1 時間）を、規則ファイル 1 つで、複数の乱数シードについて実行する。
 
     python -m town.period                         # cadl/robot_town.cadl
     python -m town.period cadl/robot_town.cadl --seeds 1 2 3
