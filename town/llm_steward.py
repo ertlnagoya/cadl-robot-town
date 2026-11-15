@@ -1,6 +1,6 @@
 """LLM の運用支援（steward）への 3 つの依頼と、その記録・再生。
 
-1. kpi    ：人間が自然言語で書いた KPI を、測り方（town/kpi.py の指標の組み合わせ）に
+1. kpi    ：人間が自然言語で書いた KPI を、評価方法（town/kpi.py の指標の組み合わせ）に
             言い換える。読み方が分かれる・代理指標の恐れがある・過去の判断の前提が
             崩れるときは、選択肢と懸念を添えて人間に返す。
 2. propose：KPI に向けて、規則・契約の改正案（CADL ファイル全体）と、規制（憲法の値）の
@@ -8,8 +8,8 @@
 3. request：人間に判断を求めるとき、測った結果をもとに、問い・選択肢の説明・
             影響を受ける当事者・推奨・分からないことを書く。
 
-LLM の出力は、どれも機械の側で確かめてから使う。測り方は指標の名前と形を、
-改正案は 4 つの関門を、判断要求は選択肢の番号を確かめ、数値は LLM の文章ではなく
+LLM の出力は、どれも機械の側で確かめてから使う。評価方法は指標の名前と形を、
+改正案は 4 つの判定を、判断要求は選択肢の番号を確かめ、数値は LLM の文章ではなく
 測った表から示す。
 
 出力は runs/<名前>/llm/p<k>-<依頼>.json に残る。--replay-dir に置いた同じ名前の
@@ -40,10 +40,10 @@ ROLES = """\
 - あなた（LLM）：KPI の達成に向けて、規則・規制・契約の改正を提案します。明らかには
   判断できない難しい問題や、人間の当事者が合意すべきことは、自分で決めずに人間に
   判断を求め、そのときに判断に必要な情報を示します。
-- 機械の関門：検査（cadl check）・憲法・同じ乱数シードで測った改善・各社の投票。
-  あなたの説明は信用されず、関門と測った値だけで判定されます。
+- 機械による判定：検査（cadl check）・憲法・同じ乱数シードで測った改善・各社の投票。
+  あなたの説明は信用されず、判定の結果と測った値だけで決まります。
 改正の層は 3 つです。
-- 規則：ROAD_USE と運用モードの切替（sos.transitions）。関門をすべて通れば採択できます。
+- 規則：ROAD_USE と運用モードの切替（sos.transitions）。判定をすべて通れば採択できます。
 - 契約：DELIVERY_SLA（顧客への集荷と配達の約束）。顧客は投票に加わらないので、
   変えるかどうかは必ず人間が決めます。
 - 規制：憲法（constitution.yaml）の不変条件や定足数。必ず人間が決めます。
@@ -86,18 +86,18 @@ KPI_SCHEMA = {
 }
 
 KPI_SYSTEM = ROLES + f"""
-いまの依頼は、人間が書いた KPI を、測れる指標の組み合わせ（測り方）に言い換える
+いまの依頼は、人間が書いた KPI を、測れる指標の組み合わせ（評価方法）に言い換える
 ことです。使える指標は次のものだけです。
 
 {kpi.catalogue()}
 
-測り方は goals（先頭が主目標。改善はこれで測ります。2 番目以降は悪化を見張る目標）と
+評価方法は goals（先頭が主目標。改善はこれで測ります。2 番目以降は悪化を監視する目標）と
 guards（改正後に必ず守る条件）からなります。
 
 - KPI の読み方が 1 通りに定まり、懸念もなければ、options を 1 つだけ返し、concerns と
   revisit を空にしてください。そのときは人間に確かめずに使われます。
 - 読み方が分かれるとき、KPI が測りやすい代わりの指標（代理指標）を目標にしていて、
-  それだけを追うと KPI の本来の狙いを損なう恐れがあるとき、KPI の中の目標どうしが
+  それだけを追うと KPI の本来の意図を損なう恐れがあるとき、KPI の中の目標どうしが
   ぶつかりうるときは、options を 2〜3 個にし、concerns に理由を書いてください。
   人間が選びます。recommended には、あなたが勧める option の番号（1 から）を入れます。
 - これまでの判断が渡されたときは、KPI の変更で前提が崩れた判断を revisit に挙げて
@@ -146,7 +146,7 @@ PROPOSE_SYSTEM = ROLES + f"""
   1 回に動かせるのは、そこに書かれた step だけです。
 - rationale には、観測のどこから何を狙ったのか、KPI がどう変わる見込みか、各社の投票の
   見込みを 2〜4 文で書きます。
-- 関門の結果を待つまでもなく人間の判断が要るとあなたが考える案は、needs_human を true に
+- 判定の結果を待たずに人間の判断が要るとあなたが考える案は、needs_human を true に
   し、why_human に理由を書きます（契約と規制の案は、そうしなくても必ず人間が判断します）。
 - これまでの人間の判断と理由を尊重してください。人間が退けた案を同じ根拠で出し直すのは
   避け、出し直すなら何が変わったのかを rationale に書きます。
@@ -184,7 +184,7 @@ REQUEST_SYSTEM = ROLES + """
 - question：人間に決めてほしいことを 1 文で書きます。
 - background：なぜあなたが自分で決めないのかを、判断を求める理由に沿って 2〜3 文で
   書きます。
-- options：渡された選択肢の id ごとに、summary（選ぶと何が起きるか。表の数値を引くときは
+- options：渡された選択肢の id ごとに、summary（選ぶとどうなるか。表の数値を引くときは
   表のとおりに書く）と stakeholders（誰が得をし、誰が損をするか。顧客を忘れない）を書きます。
   渡されていない id を作ってはいけません。
 - recommendation：あなたが勧める id と、その理由です。
@@ -223,7 +223,7 @@ def propose_request(kpi_text: str, spec: dict, mode_note: str, env: dict, observ
                     rules: str, lang: str = "ja") -> dict:
     user = (
         f"## KPI（人間が書いたもの）\n{kpi_text}\n\n"
-        f"## KPI の測り方（人間が確かめたもの）\n```json\n{json.dumps(spec, ensure_ascii=False, indent=1)}\n```\n\n"
+        f"## KPI の評価方法（人間が確かめたもの）\n```json\n{json.dumps(spec, ensure_ascii=False, indent=1)}\n```\n\n"
         f"## 運用モードの設定\n{mode_note}\n\n"
         f"## この期の環境\n{env['label']}（注文の平均間隔 {env['order_interval_s']} 秒"
         + (f"、ラッシュ {env['rush']}" if env.get("rush") else "") + "）\n\n"
@@ -239,7 +239,7 @@ def propose_request(kpi_text: str, spec: dict, mode_note: str, env: dict, observ
 
 def request_request(kpi_text: str, spec_text: str, reasons: str, table: str, options: str,
                     decisions: str, lang: str = "ja") -> dict:
-    user = (f"## KPI（人間が書いたもの）\n{kpi_text}\n\n## KPI の測り方\n{spec_text}\n\n"
+    user = (f"## KPI（人間が書いたもの）\n{kpi_text}\n\n## KPI の評価方法\n{spec_text}\n\n"
             f"## 判断を求める理由\n{reasons}\n\n## 測った結果\n{table}\n\n"
             f"## 選択肢（id: 内容）\n{options}\n\n"
             f"## これまでの判断（人間の理由を含む）\n{decisions or '（なし）'}\n")

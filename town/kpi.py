@@ -1,10 +1,10 @@
-"""KPI：人間が自然言語で書いたサービスの目標と、その測り方。
+"""KPI：人間が自然言語で書いたサービスの目標と、その評価方法。
 
 kpi.md は「## 第 k 期から」（英語なら「## From period k」）の見出しで区切る。第 k 期には、見出しの番号が
 k 以下で最大の節が効く。人間は期と期のあいだに kpi.md を書き換えてよい
 （town.steward は期の初めに読み直す）。
 
-自然言語の KPI を、LLM が下の METRICS の組み合わせ（測り方）に言い換える。
+自然言語の KPI を、LLM が下の METRICS の組み合わせ（評価方法）に言い換える。
 
     {"goals":  [{"metric": "on_time_deliveries", "text": "町全体の定時配達を増やす"}, ...],
      "guards": [{"metric": "min_company_on_time_rate", "op": ">=", "value": 0.8,
@@ -76,7 +76,7 @@ def load(path: Path, period: int) -> tuple[int, str]:
 
 
 def validate(spec: dict) -> str:
-    """測り方として使えなければ、その理由（使えれば空文字）。"""
+    """評価方法として使えなければ、その理由（使えれば空文字）。"""
     goals = spec.get("goals") or []
     if not goals:
         return "主目標（goals の先頭）がない"
@@ -110,7 +110,7 @@ def worsened(spec: dict, cur: dict[str, float], cand: dict[str, float]) -> list[
 
 
 def describe(spec: dict, msg) -> str:
-    """測り方の要約。msg は town.messages.Messages（言語を決める）。"""
+    """評価方法の要約。msg は town.messages.Messages（言語を決める）。"""
     up = lambda g: msg("goal_up") if METRICS[g["metric"]][1] > 0 else msg("goal_down")
     goals = msg("comma").join(f"{g['metric']}（{up(g)}）" if msg.lang == "ja" else f"{g['metric']} ({up(g)})"
                               for g in spec["goals"])
