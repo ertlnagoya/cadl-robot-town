@@ -1,27 +1,25 @@
-# Answers to the decision requests of a real run with Claude Opus 5.5 (2026-11-15).
+# Answers to the decision requests of a real run with Claude Opus 5.5 (2026-11-16).
 # The human (operator) role was played by Claude when this record was made. To answer
 # yourself, drop --answers and answer in the terminal, or edit this file.
 K1:
   choice: "1"
-  reason: Follow the order of the KPI. Town-wide on-time deliveries are the main goal, and the worst company's on-time rate has a floor. The floor is provisional and will be revisited once period 1 is measured.
+  reason: Follow the order of the KPI. Town-wide on-time deliveries are the main goal, and the worst company's on-time rate has a floor. The floor of 0.7 is provisional and will be revisited once period 1 is measured.
   assumptions:
     - Customers cannot choose which company delivers their order
 D1:
   choice: "2"
   reason: The intersections are a road shared by the three companies; waiting there is no company's right. Late deliveries fall from 10.4 to 1.2 and the worst company's on-time rate rises to 0.98, so adopt it against B's and C's votes. Re-measure C's utility (28.8 to 19.0) and the road violations next period. The constitutional floor (R1) can wait; it changes nothing now.
   assumptions:
-    - B and C keep delivering in the town after the rule changes
+    - B and C keep delivering in the town after the rules change
 D2:
   choice: keep
-  reason: Only 2 of 5 seeds improve; do not cut C's utility by 16 for an uncertain gain.
+  reason: A and B vote for it, so it reaches the quorum of two and needs no override. But it improves on only 2 of 5 seeds, and C's utility would fall from 56.3 to 40.1. Do not make an uncertain change at C's cost.
 K5:
   choice: "1"
-  reason: In the quiet season there are almost no late deliveries, so narrowing the gap between the companies' utilities comes first. A change that narrows the gap while on-time deliveries or total sanctions get worse is caught by the monitored goals and decided case by case. Keep the floor at 0.7 until the quiet season has been measured once.
+  reason: In the quiet season, keep the companies cooperating; the main goal is narrowing the spread of utility, with a floor on the worst company's on-time rate so that the spread cannot be narrowed by making service worse. Keep the floor of 0.9 until the quiet season has been measured once.
 D5:
-  choice: "1"
-  reason: Switching off sanctions (3) narrows the gap only on paper and changes nothing about how the road is used. Returning block_k to 3 (2) adds about 6 late deliveries, and nothing undoes D1's reason (fewer late deliveries for customers). hold_limit 70 s narrows the gap at almost no cost to on-time delivery.
-  assumptions:
-    - Late deliveries rising from 1.8 to 2.4 is acceptable to customers
+  choice: "3"
+  reason: It is the only option that narrows the utility spread while keeping the 0.9 floor, and A and C make the quorum. Reverting D1 or removing sanctions narrows the spread by making service worse (lowest on-time rate 0.83 and 0.89), which the floor was set to prevent.
 D6:
   choice: keep
-  reason: The gap narrows by only 1.6, by moving utility from A and B to C, while on-time deliveries and the lowest on-time rate both get worse. Do not extend hold_limit beyond D5's reason for 70 s (almost no cost to on-time delivery). The constitutional floor (R1) still changes nothing now.
+  reason: The spread narrows by only 1.6, and only because A and B lose a little while C gains a little; customers get slightly worse service (the worst on-time rate falls from 0.97 to 0.94). One step toward fairness was taken in D5. Keep the rules until the quiet season shows a change that narrows the spread without costing customers.
