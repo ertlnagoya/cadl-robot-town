@@ -22,11 +22,11 @@ amendable:
     min: 1
     max: 4
     step: 1
-  sanction_lambda:   # 違反 1 件あたりの罰点の倍率（Minor=1, Major=3）
+  sanction_lambda:   # 違反 1 件あたりの罰点の倍率（Minor=1, Major=3）。CADL の検査で 0〜1 に限られる
     layer: rule
     unit: ""
     min: 0.0
-    max: 2.0
+    max: 1.0
     step: 0.5
   to_central:        # 分散 → 集中に切り替える、5 分間の注文件数の上限（これ未満で集中へ）
     layer: rule

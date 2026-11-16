@@ -6,9 +6,12 @@ LLM は規則ファイルを丸ごと書き直して返す。何を変えたか�
 
 提案は runs/<名前>/llm-round<k>.json に保存する。--proposer replay で、
 保存した提案を LLM を呼ばずに再生できる（API キーがない環境や授業用）。
+記録には依頼の要約（request_digest）が入り、再生のときに依頼が記録と違えば
+注記を出す（town.steward の記録と同じ仕組み）。
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -55,9 +58,10 @@ SYSTEM = f"""\
 
 まず assessment に、この期の観測から読み取れる問題（または問題がないこと）を
 日本語で 2〜3 文で書いてください。そのうえで、改正案を最大 {MAX_PROPOSALS} 件出してください。各案の cadl には、改正後の規則
-ファイル全体を書きます。rationale には、観測のどこから何を狙ったのかと、
+ファイル全体を書きます。rationale には、観測のどの値から何を改善しようとしたのかと、
 各社の投票の見込みを日本語で 2〜4 文で書きます。改正すべき点がなければ、
-proposals を空にしてください。"""
+proposals を空にしてください。比喩は使わず、そのままの言葉で書いてください
+（「狙い」ではなく「意図」、「関門」ではなく「判定」、「見張る」ではなく「監視する」）。"""
 
 
 def _observation(cur: dict) -> str:
@@ -160,14 +164,27 @@ def propose_llm(request: dict) -> tuple[list[dict], str, str]:
     return proposals, note, data.get("assessment", "")
 
 
-def save(path: Path, proposals: list[dict], note: str, assessment: str) -> None:
-    path.write_text(json.dumps({"note": note, "assessment": assessment, "proposals": proposals},
+def digest(request: dict) -> str:
+    """依頼の要約。system と messages だけから作る（モデル名や effort は含めない）。"""
+    return hashlib.sha256(json.dumps([request["system"], request["messages"]],
+                                     ensure_ascii=False).encode()).hexdigest()[:16]
+
+
+def save(path: Path, proposals: list[dict], note: str, assessment: str, request: dict) -> None:
+    path.write_text(json.dumps({"note": note, "request_digest": digest(request),
+                                "assessment": assessment, "proposals": proposals},
                                ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def replay(path: Path) -> tuple[list[dict], str, str]:
+def replay(path: Path, request: dict) -> tuple[list[dict], str, str]:
+    """保存した提案を再生する。request は、いま LLM を呼ぶとしたら送る依頼で、
+    記録の request_digest と比べるのに使う。"""
     if not path.exists():
         return [], f"{path} がないため、この期は案なし", ""
     data = json.loads(path.read_text(encoding="utf-8"))
-    return (data["proposals"][:MAX_PROPOSALS], f"再生: {path}（{data.get('note', '')}）",
-            data.get("assessment", ""))
+    note = f"再生: {path}（{data.get('note', '')}）"
+    if "request_digest" not in data:
+        note += "。注意：記録に依頼の要約がないため、依頼が記録と同じか確かめられない"
+    elif data["request_digest"] != digest(request):
+        note += "。注意：記録したときと依頼の内容が違う（規則、憲法、改正履歴、プロンプトのどれかが変わった）"
+    return data["proposals"][:MAX_PROPOSALS], note, data.get("assessment", "")

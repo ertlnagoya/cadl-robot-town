@@ -20,12 +20,12 @@ LLM の出力は、どれも機械の側で確かめてから使う。評価方�
 """
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
 from . import kpi
 from .llm_council import MODEL, call_json
+from .llm_council import digest as request_digest
 from .messages import Messages
 from .period import ROOT
 
@@ -144,7 +144,7 @@ PROPOSE_SYSTEM = ROLES + f"""
 - 規制の改正案（regulation_proposals）は最大 1 件です。key には憲法の regulation に
   挙がった名前（例 invariants.min_company_on_time_rate）を、value には新しい値を書きます。
   1 回に動かせるのは、そこに書かれた step だけです。
-- rationale には、観測のどこから何を狙ったのか、KPI がどう変わる見込みか、各社の投票の
+- rationale には、観測のどの値から何を改善しようとしたのか、KPI がどう変わる見込みか、各社の投票の
   見込みを 2〜4 文で書きます。
 - 判定の結果を待たずに人間の判断が要るとあなたが考える案は、needs_human を true に
   し、why_human に理由を書きます（契約と規制の案は、そうしなくても必ず人間が判断します）。
@@ -257,8 +257,7 @@ class Recorder:
 
     def get(self, step: str, request: dict) -> tuple[dict | None, str]:
         out = self.dir / f"{step}.json"
-        digest = hashlib.sha256(json.dumps([request["system"], request["messages"]],
-                                           ensure_ascii=False).encode()).hexdigest()[:16]
+        digest = request_digest(request)
         src = next((d / f"{step}.json" for d in (self.replay_dir, self.dir)
                     if d and (d / f"{step}.json").exists()), None)
         if src:

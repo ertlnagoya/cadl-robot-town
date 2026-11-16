@@ -222,17 +222,17 @@ def main() -> int:
         if args.proposer == "neighbors":
             proposals = neighbor_proposals(text, const["amendable"])
         else:
+            req = llm_council.build_request(text, const_text, env, cur, history, args.objective,
+                                            args.mode)
             if args.proposer == "llm":
-                req = llm_council.build_request(text, const_text, env, cur, history, args.objective,
-                                                args.mode)
                 if args.check:
                     print(f"  [check] {req['model']} に送る依頼: system {len(req['system'])} 字、"
                           f"user {len(req['messages'][0]['content'])} 字。LLM は呼ばずに終わります。")
                     return 0
                 proposals, note, view = llm_council.propose_llm(req)
-                llm_council.save(run_dir / f"llm-round{rnd}.json", proposals, note, view)
+                llm_council.save(run_dir / f"llm-round{rnd}.json", proposals, note, view, req)
             else:
-                proposals, note, view = llm_council.replay(args.replay_dir / f"llm-round{rnd}.json")
+                proposals, note, view = llm_council.replay(args.replay_dir / f"llm-round{rnd}.json", req)
             print(f"  LLM の委員会: {note}、{len(proposals)} 件")
             if view:
                 print(f"  所見: {view}")

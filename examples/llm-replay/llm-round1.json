@@ -1,5 +1,6 @@
 {
-  "note": "授業用の見本。LLM の出力ではなく、3 つの関門の働きを見せるために手で書いた案",
+  "note": "授業用の見本。LLM の出力ではなく、4 つの判定のうち 3 つの働きを見せるために手で書いた案",
+  "request_digest": "5e4aa9d9664779d2",
   "edits": [
     "2026-10-19: the rules file gained two AMEND steps (TOWN_STEWARD -> COUNCIL : violation_report, COUNCIL -> TOWN_STEWARD : rule_update) and the matching interface entries. The same lines were inserted into the cadl of each proposal below, mechanically and identically, because the constitution gate compares a proposal with the current rules line by line. Nothing else in the proposals was changed.",
     "2026-10-29: the rules file now tags the DELIVERY_SLA deadlines and guarantees with `# @amend:pickup_deadline` and `# @amend:dropoff_deadline` (the contract layer), and two comments changed to say so. The same tags and comment lines were inserted into the cadl of each proposal below, mechanically and identically, because the constitution gate compares a proposal with the current rules line by line. Nothing else in the proposals was changed."

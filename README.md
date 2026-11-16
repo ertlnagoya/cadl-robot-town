@@ -29,8 +29,10 @@ There are two amendment loops.
 - Moving robots pass through intersections; a robot stopped at an
   intersection (loading, or waiting on the road for its next order) blocks it.
 - Company policies (`town/policies.py`): A always returns to its garage,
-  B waits on the road until just before the time limit, C waits on the road
-  until sanctions become heavy.
+  B waits on the road until just before the time limit (and stays as long as it
+  likes when there are no sanctions), C waits on the road until an order comes or
+  it is evicted; at the highest sanction weight (1.0) it leaves 15 seconds after
+  the time limit.
 - Two operating modes, DISTRIBUTED and CENTRALIZED, switched by the conditions
   in CADL `sos.transitions`. A switch to CENTRALIZED takes effect only once no
   robot is waiting on the road, and the transition's `safety_invariant` is
@@ -62,7 +64,7 @@ python -m town.period --mode DISTRIBUTED        # one period (one simulated hour
 python -m town.council --mode DISTRIBUTED       # one round of the amendment loop
 python -m town.council --mode DISTRIBUTED --rounds 6 --name seasons-d   # six periods, demand from scenario.yaml
 python -m town.council --objective road_violations --mode DISTRIBUTED --rounds 8 --name goodhart-d
-python -m town.compare runs/goodhart-d/v1.cadl runs/goodhart-d/v5.cadl runs/seasons-d/v7.cadl --mode DISTRIBUTED
+python -m town.compare runs/goodhart-d/v1.cadl runs/goodhart-d/v5.cadl runs/seasons-d/v4.cadl --mode DISTRIBUTED
 python -m town.period --rush 1200 2400 25 --no-quiescence
 python -m town.council --proposer llm --mode DISTRIBUTED --rounds 2 --name llm-distributed   # needs ANTHROPIC_API_KEY
 python -m town.council --proposer replay --replay-dir examples/llm-distributed --mode DISTRIBUTED --rounds 2
@@ -75,28 +77,29 @@ numbers, are in [README.ja.md](README.ja.md) and on the hands-on page.
 
 ## What the experiments show
 
-- **Vetoes**: the amendment that helps the town most (`block_k 3 → 2`, evict
-  a robot once two robots wait behind it) is voted down by B and C, who gain
-  from waiting on the road; a small amendment all three accept passes instead.
-- **Demand**: in quiet periods B switches sides and the same amendment passes.
+- **Sanctions and vetoes**: the amendment that helps the town most doubles the
+  sanction weight (`sanction_lambda 0.5 → 1`); C then leaves the intersection
+  15 seconds after the time limit, and blocked time falls from 2404 s to 845 s.
+  C votes against, but A and B make the quorum of two. Evicting a robot once two
+  robots wait behind it (`block_k 3 → 2`) also helps, and is voted down by B and C,
+  who gain from waiting on the road, in every period.
+- **Demand**: after period 1 only small `hold_limit` steps pass in the busy
+  season, and nothing improves the goal in the quiet season.
 - **Goodhart drift**: with the objective "fewer road-rule violations", the
   rules loosen period after period; counted violations fall while blocked time
-  and late deliveries rise by about half.
+  and late deliveries rise by about half. Heavier sanctions also reduce the count
+  in every period, but a loosening reduces it as much or more, and C always votes
+  against heavier sanctions. The rules of the on-time objective, which doubled the
+  sanctions, end with fewer road violations (19.8) than the loosened ones (21.0).
 - **Operating modes**: CENTRALIZED wins except at very high demand; with a
   mid-period rush, switching beats both fixed modes. Switching without waiting
   for the road to clear breaks the safety invariant.
 - **LLM council**: Claude's proposals all pass the check and the constitution
-  and pick the same best amendment as the rule-based search, but it mispredicts
-  company B's vote and never proposes the loosening amendment that everyone
-  accepts. `examples/llm-distributed/` is a real run you can replay without an
-  API key. On 2026-10-19 the starting rules gained two AMEND steps
-  (`TOWN_STEWARD -> COUNCIL : violation_report`, `COUNCIL -> TOWN_STEWARD :
-  rule_update`) and their interface entries. The same lines were inserted,
-  mechanically, into every recorded proposal in `examples/llm-distributed/`
-  and `examples/llm-replay/`, because the constitution gate compares a
-  proposal with the current rules line by line; nothing else in the proposals
-  changed, and the replays print the same results as before. Each file
-  records this in its `edits` field.
+  (on 2026-11-16: `block_k 3 → 2` and `hold_limit 60s → 50s`), but none is
+  adopted. It never proposes the heavier sanction weight the rule-based council
+  adopts, since it is not told how the companies behave, and it mispredicts
+  company B's vote. `examples/llm-distributed/` is a real run you can replay
+  without an API key.
 
 ## Humans set the KPI, the LLM proposes (town.steward)
 
@@ -141,45 +144,56 @@ record anyway.
 
 ### Real LLM records
 
-The following records come from real runs with Claude Opus 5.5 on 2026-11-15 (cadl 0.3.31).
+The following records come from real runs with Claude Opus 5.5 on 2026-11-16 (cadl 0.3.31).
 The answers to the decision requests (`answers.yaml`) were written by Claude
 playing the human operator when the records were made.
 
 | Record | Contents |
 |---|---|
-| `examples/steward-d-en/` | six periods with `kpi.en.md` (English); about 59,400 input / 48,100 output tokens |
-| `examples/steward-d/` | the same in Japanese (`kpi.md`); about 69,300 / 67,700 tokens |
+| `examples/steward-d-en/` | six periods with `kpi.en.md` (English); about 60,300 input / 48,700 output tokens |
+| `examples/steward-d/` | the same in Japanese (`kpi.md`); about 70,700 / 63,700 tokens |
 | `examples/steward-goodhart/en/` | a proxy KPI ("reduce road-rule violations"), one period, in English |
 | `examples/steward-goodhart/proxy/`, `guarded/` | the same proxy KPI in Japanese, answered two ways |
+| `examples/llm-distributed/` | the LLM as the council of `town.council`, two periods |
 
 - Period by period (English): the vetoed `block_k 3 → 2` is adopted by the
-  human against the LLM's recommendation (a regulation); an uncertain tightening
-  is kept back; nothing is adopted in the busy season; after the KPI changes to
-  fairness, the LLM recommends switching off sanctions and the human adopts
-  `hold_limit 60s → 70s` instead; a further step that lowers the worst company's
-  on-time rate is kept back against the LLM's recommendation. The rules end at v3.
-- The Japanese run parts from the English one in period 3: the LLM proposes
-  `block_k 2 → 1` (5/5 seeds, but C's utility halves), which the human keeps
-  back; in period 4 the human adopts `hold_limit 60s → 50s` against C's vote, and
-  in period 5, under the fairness KPI, takes it back (`hold_limit 50s → 60s`,
-  all three companies for). The rules end at v4, with the same values as v2.
-- In periods 2 and 4 the LLM wrote of "B's and C's objection" to proposals that
-  B voted for, and listed the mismatch as unknown: the decision-request call is
-  not given the constitution, so the LLM does not know the quorum.
-- With the proxy KPI, the Japanese LLM proposed a loosening (`hold_limit 60s → 70s`,
-  fewer counted violations on 5/5 seeds, all three companies for), then flagged it
-  for the human, writing that the count falls because the threshold moved, not
-  because the rules are kept, and recommended keeping the rules. In neither language
-  did the LLM offer a measure that looks at the count alone; every option also
-  watched blocked time.
+  human, as the LLM recommends; an uncertain tightening is kept back; nothing is
+  adopted in the busy season; after the KPI changes to fairness, the human adopts
+  `hold_limit 60s → 70s`, as the LLM recommends; a further step that lowers the
+  worst company's on-time rate is kept back against the LLM's recommendation.
+  The rules end at v3.
+- The Japanese run parts from the English one in period 1: its LLM also proposes
+  doubling the sanction weight (`sanction_lambda 0.5 → 1`), which removes every
+  late delivery and passes the vote with A and B; the human adopts it. Every later
+  proposal improves on at most 3 of 5 seeds, and the human keeps the rules in
+  every period. The rules end at v2.
+- Lighter sanctions (`1 → 0.5` in Japanese period 5, `0.5 → 0` in English period 5)
+  narrow the spread of utilities but let C (and, with no sanctions, B) wait at the
+  intersection longer; late deliveries rise and the lowest on-time rate falls below
+  the KPI condition. Neither LLM recommends them.
+- In English period 2 the LLM wrote that a proposal A and B voted for "will very
+  likely fail the 2-of-3 vote", and listed the mismatch as unknown: the
+  decision-request call is not given the constitution, so the LLM does not know the
+  quorum. In Japanese period 6 it took the constitution's `objective` for the
+  improvement gate, which `town.steward` does not use.
+- With the proxy KPI, the Japanese LLM proposed both the heavier sanction weight and
+  a loosening (`hold_limit 60s → 70s`); both cut the count from 25.8 to 23.6, but
+  only the first cuts blocked time. The LLM flagged the loosening for the human and
+  recommended the sanctions; the English LLM proposed only the sanctions, which were
+  adopted automatically.
 
-On 2026-10-29 the rules file gained contract-layer tags on the `DELIVERY_SLA`
-deadlines and guarantees, and two comments changed to match; the same lines were
-inserted, mechanically, into every recorded proposal of `examples/llm-distributed/`
-and `examples/llm-replay/` (see `edits`). The replays print the same results.
-The second hand-written proposal in `examples/llm-replay/` is still stopped at
-the constitution gate, now because its pickup deadline no longer matches its
-guarantee line (before, because it changed a line that was not tagged).
+The hand-written sample in `examples/llm-replay/` has had lines inserted
+mechanically when the starting rules changed (two AMEND steps on 2026-10-19,
+contract-layer tags on the `DELIVERY_SLA` lines on 2026-10-29; see `edits`),
+because the constitution gate compares a proposal with the current rules line by
+line. Its second proposal is stopped at the constitution gate because its pickup
+deadline no longer matches its guarantee line.
+
+Council records carry a request digest (`request_digest`), as the `town.steward`
+records do. On replay, the request is rebuilt from the current rules,
+constitution, amendment history and prompt and compared with the record; if they
+differ, the replay prints a note. The hand-written sample holds the digest of the
+current request.
 
 ## License
 
