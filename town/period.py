@@ -82,6 +82,8 @@ def evaluate(ir: dict, seeds: list[int], period_s: int,
         "orders": sum(r["orders"] for r in runs) / n,
         "unfinished": sum(r["unfinished"] for r in runs) / n,
         "blocked_s": sum(r["blocked_s"] for r in runs) / n,
+        "p95_wait_s": avg("p95_wait_s"),
+        "max_wait_s": avg("max_wait_s"),
         "violations": {k: v / n for k, v in sorted(violations.items())},
         "violation_total": sum(violations.values()) / n,
         # 道路の規則（ROAD_USE）の違反だけ：期限 release の超過と blocking_guard の退去
