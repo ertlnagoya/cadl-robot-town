@@ -1,25 +1,40 @@
-# Answers to the decision requests of a real run with Claude Opus 5.5 (2026-11-16).
-# The human (operator) role was played by Claude when this record was made. To answer
-# yourself, drop --answers and answer in the terminal, or edit this file.
 K1:
-  choice: "1"
-  reason: Follow the order of the KPI. Town-wide on-time deliveries are the main goal, and the worst company's on-time rate has a floor. The floor of 0.7 is provisional and will be revisited once period 1 is measured.
+  choice: '1'
+  reason: Follow the order of the KPI. Town-wide on-time deliveries are the main goal,
+    and the worst company's 95th-percentile wait is watched. The KPI gives no level
+    for "badly"; 240 s would be our own reading, so set the level after period 1 is
+    measured.
   assumptions:
-    - Customers cannot choose which company delivers their order
+  - Customers cannot choose which company delivers their order
 D1:
-  choice: "2"
-  reason: The intersections are a road shared by the three companies; waiting there is no company's right. Late deliveries fall from 10.4 to 1.2 and the worst company's on-time rate rises to 0.98, so adopt it against B's and C's votes. Re-measure C's utility (28.8 to 19.0) and the road violations next period. The constitutional floor (R1) can wait; it changes nothing now.
-  assumptions:
-    - B and C keep delivering in the town after the rules change
+  choice: '2'
+  reason: The intersections are a road shared by the three companies; waiting there
+    is no company's right. On-time deliveries rise on all 5 seeds, late deliveries
+    fall from 10.4 to 1.2 and the worst company's p95 wait from 273 s to 95.6 s, so
+    adopt it against B's and C's votes. Re-measure C's utility (28.8 to 19.0) and
+    the road violations (25.8 to 34.0) next period.
 D2:
   choice: keep
-  reason: A and B vote for it, so it reaches the quorum of two and needs no override. But it improves on only 2 of 5 seeds, and C's utility would fall from 56.3 to 40.1. Do not make an uncertain change at C's cost.
+  reason: The change passes the vote with A and B, but only 2 of 5 seeds improve.
+    Do not cut C's utility from 56.3 to 40.1 for an uncertain gain; the worst company's
+    p95 wait is already 109 s, within the 120 s promise.
 K5:
-  choice: "1"
-  reason: In the quiet season, keep the companies cooperating; the main goal is narrowing the spread of utility, with a floor on the worst company's on-time rate so that the spread cannot be narrowed by making service worse. Keep the floor of 0.9 until the quiet season has been measured once.
+  choice: '1'
+  reason: In the quiet season, keep the companies cooperating; the main goal is narrowing
+    the spread of utility, which includes the sanctions the road rules create. The
+    worst company's on-time rate is watched so that the spread cannot be narrowed
+    by making service worse. Re-measure D1's block_k change under this measure.
 D5:
-  choice: "3"
-  reason: It is the only option that narrows the utility spread while keeping the 0.9 floor, and A and C make the quorum. Reverting D1 or removing sanctions narrows the spread by making service worse (lowest on-time rate 0.83 and 0.89), which the floor was set to prevent.
+  choice: '2'
+  reason: Narrow the spread without making service worse. Options 1 and 3 narrow it
+    more, but late deliveries rise from 1.8 to 7.8 or 6.6 and the lowest on-time rate
+    falls; option 3 also nearly doubles road violations and narrows the spread by
+    no longer counting misuse. hold_limit 60 s → 70 s narrows the spread on 4 of 5
+    seeds, keeps the sanctions and D1's change, and passes the vote with A and C.
 D6:
   choice: keep
-  reason: The spread narrows by only 1.6, and only because A and B lose a little while C gains a little; customers get slightly worse service (the worst on-time rate falls from 0.97 to 0.94). One step toward fairness was taken in D5. Keep the rules until the quiet season shows a change that narrows the spread without costing customers.
+  reason: Both options narrow the spread by making service worse, which D5 ruled out.
+    block_k 2 → 3 more than triples late deliveries (1.8 to 6.0) and drops the lowest
+    on-time rate to 0.89; hold_limit 70 s → 80 s gains only +1.6 and lowers the lowest
+    on-time rate from 0.97 to 0.94. Look for a change that raises C's utility without
+    worse service.

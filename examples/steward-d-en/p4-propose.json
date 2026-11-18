@@ -1,8 +1,8 @@
 {
-  "note": "claude-opus-5-5、入力 7103 / 出力 1113 トークン",
-  "request_digest": "4f619490f8e50988",
+  "note": "claude-opus-5-5、入力 7162 / 出力 666 トークン",
+  "request_digest": "9aa40b9608da57cd",
   "data": {
-    "assessment": "Under busy-plus-rush demand the current rules (block_k=2) deliver 272.6 of 274.6 orders on time (99.3%) with 0 unfinished and only 2.0 late in total. Every company is at or above 0.98 on-time, so the 0.7 guard and the 0.6 constitutional floor are far from binding. The remaining costs are A's 516 blocked seconds with its 1.8 late pickups, and road penalties concentrated on C (21.4) and B (9.0). The primary metric's headroom is only about 2 orders, barely above the 1.0 minimum improvement, so no rule step is likely to clear the noise threshold.",
+    "assessment": "Under the current rules (block_k = 2, distributed mode) the busy-plus-rush period delivers 272.6 of 274.6 orders on time (0.99), with 0.0 unfinished. The worst company's p95 wait is 98.2 s, inside the 120 s promise. Only about 2 orders per period are late, almost all of them A's pickups, so the main goal has at most about 2 deliveries of headroom against the committee's 1.0 minimum improvement. The remaining frictions fall mostly on B and C: C's sanctions are 21.4, its utility is 68.8 against A's 97.4, and there are 15.6 blocking-guard evictions. These do not hurt the KPI metrics now.",
     "proposals": [],
     "regulation_proposals": []
   }

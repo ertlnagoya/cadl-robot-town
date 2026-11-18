@@ -1,99 +1,74 @@
 {
-  "note": "claude-opus-5-5、入力 2431 / 出力 2306 トークン",
-  "request_digest": "3d9bc1a042d0d562",
+  "note": "claude-opus-5-5、入力 3056 / 出力 2096 トークン",
+  "request_digest": "70603fbcec8205cf",
   "data": {
-    "interpretation": "The KPI has two parts. The main objective is the town-wide count of deliveries that meet both promised windows (pickup within 120 s of the order, delivery within 120 s of pickup), which maps to on_time_deliveries. The second sentence is a fairness floor: no single company's customers should get badly worse service, which maps most directly to min_company_on_time_rate. 'Badly' is not quantified, so any threshold is a human judgement. The 120 s windows are part of DELIVERY_SLA, a contract. They are a fixed yardstick for this KPI and must not be changed as a way to improve the metrics; any SLA change needs a human decision.",
+    "interpretation": "The main aim is to maximize the number of orders delivered within the promised times (pickup within 120 s of order, delivery within 120 s of pickup) across the whole town, so on_time_deliveries is the primary goal. The second sentence adds a per-company protection: no company's customers should wait badly. It can be read as a tail of waiting times per company or as each company's on-time rate. The KPI gives no level for 'badly'.",
     "options": [
       {
-        "label": "Maximize town-wide on-time deliveries, with a floor on the worst company's on-time rate",
+        "label": "Maximize on-time deliveries; watch the worst company's waiting tail (no level set)",
         "goals": [
           {
             "metric": "on_time_deliveries",
-            "text": "Primary: number of orders delivered within both promised windows across the town (higher is better)."
+            "text": "Deliver as many orders as possible within the promised pickup and delivery times across the town."
           },
           {
-            "metric": "min_company_on_time_rate",
-            "text": "Monitor: on-time rate of the worst-served company must not deteriorate."
+            "metric": "worst_company_p95_wait_s",
+            "text": "No company's customers should be kept waiting badly: monitor the 95th-percentile wait of the worst-off company so it does not get worse."
           },
           {
             "metric": "unfinished",
-            "text": "Monitor: orders left undelivered at period end, so on-time counts are not raised by abandoning hard orders."
-          },
-          {
-            "metric": "late_deliveries",
-            "text": "Monitor: town-wide late deliveries."
+            "text": "Monitor orders left undelivered at the end of the period, so already-late orders are not abandoned to raise the on-time count."
           }
         ],
-        "guards": [
-          {
-            "metric": "min_company_on_time_rate",
-            "op": ">=",
-            "value": 0.7,
-            "text": "Every company keeps at least 70% of its deliveries on time (provisional reading of 'not kept waiting badly'; calibrate against baseline)."
-          }
-        ],
-        "note": "Closest to the literal KPI: volume first, fairness as a hard floor. The 0.7 threshold is a placeholder for the human to set, ideally relative to the measured baseline."
+        "guards": [],
+        "note": "Reads 'waiting badly' as the long tail of order-to-delivery waits within each company. No numeric threshold is set because the KPI does not state what counts as 'badly'. The goal only prevents this from getting worse."
       },
       {
-        "label": "Maximize the worst company's on-time rate, with town-wide volume as a monitored goal",
+        "label": "Maximize on-time deliveries; worst company's p95 wait within the promised total (240 s)",
         "goals": [
           {
-            "metric": "min_company_on_time_rate",
-            "text": "Primary: on-time rate of the worst-served company (higher is better)."
+            "metric": "on_time_deliveries",
+            "text": "Deliver as many orders as possible within the promised pickup and delivery times across the town."
           },
           {
-            "metric": "on_time_deliveries",
-            "text": "Monitor: town-wide on-time deliveries must not drop."
+            "metric": "worst_company_p95_wait_s",
+            "target": 240,
+            "text": "No company's customers should be kept waiting badly, read as: for every company, at most 5% of orders wait longer than the promised 120 s + 120 s = 240 s from order to delivery."
           },
           {
             "metric": "unfinished",
-            "text": "Monitor: undelivered orders at period end."
+            "text": "Monitor orders left undelivered at the end of the period, so late orders are not abandoned."
           }
         ],
-        "guards": [
-          {
-            "metric": "on_time_rate_gap",
-            "op": "<=",
-            "value": 0.2,
-            "text": "Gap between the best and worst company's on-time rate stays within 20 percentage points (provisional)."
-          }
-        ],
-        "note": "Puts the fairness sentence first. It may accept amendments that help the weakest company even when town-wide gains are small. Choose this if the second sentence is the binding concern."
+        "guards": [],
+        "note": "The 240 s level adds the two promised legs from the KPI. Treating that sum as the line for 'badly' is an interpretation the human must confirm. 'Badly' may instead mean something well beyond the promise."
       },
       {
-        "label": "Maximize town-wide on-time deliveries; read 'kept waiting badly' as late or abandoned orders",
+        "label": "Maximize on-time deliveries; protect the lowest company's on-time rate",
         "goals": [
           {
             "metric": "on_time_deliveries",
-            "text": "Primary: town-wide on-time deliveries."
-          },
-          {
-            "metric": "late_deliveries",
-            "text": "Monitor: town-wide late deliveries."
+            "text": "Deliver as many orders as possible within the promised pickup and delivery times across the town."
           },
           {
             "metric": "min_company_on_time_rate",
-            "text": "Monitor: worst company's on-time rate."
-          }
-        ],
-        "guards": [
+            "text": "No company's customers should be treated badly: monitor the on-time rate of the worst-off company so it does not fall."
+          },
           {
             "metric": "unfinished",
-            "op": "<=",
-            "value": 0,
-            "text": "No order is left undelivered at period end (provisional; customers never served are the worst case of waiting)."
+            "text": "Monitor orders left undelivered at the end of the period."
           }
         ],
-        "note": "Reads 'badly' as orders that are very late or never delivered, not as a per-company rate. It does not directly protect a specific company, so fairness is only monitored."
+        "guards": [],
+        "note": "Reads the fairness clause as on-time performance per company rather than waiting time. This does not catch very long waits on orders that are already late."
       }
     ],
     "recommended": 1,
     "concerns": [
-      "'Kept waiting badly' is not quantified. It could mean a per-company on-time rate floor, a cap on the rate gap between companies, or no abandoned or very late orders. The guard thresholds (0.7, 0.2, 0) are placeholders the human must confirm.",
-      "on_time_deliveries is a count. Optimizing it alone can reward rules that let the hard or remote orders of one company go unfinished or late, which goes against the fairness sentence. For that reason unfinished and min_company_on_time_rate are monitored.",
-      "Maximizing the town-wide total and protecting the worst company can conflict. Road rules that favor throughput, such as letting busy robots hold a road longer, may push one company's on-time rate down.",
-      "With only 2 robots per company, per-company rates are noisy. A strict guard on min_company_on_time_rate or on_time_rate_gap may reject good amendments because of random variation unless the measurement covers enough orders.",
-      "Both metrics depend on the 120 s windows in DELIVERY_SLA. Relaxing the SLA would inflate on-time counts without real improvement, so the SLA must be treated as fixed under this KPI. Any change to it is a contract decision for the human."
+      "The KPI gives no level for 'kept waiting badly', so no threshold can be set without the human. Option 2 uses 240 s (the sum of the two promised legs) only as a candidate the human must confirm.",
+      "on_time_deliveries counts only orders that meet the promise. Chasing it alone could deprioritize orders that are already late and leave them waiting very long or undelivered. This is why unfinished and a waiting-tail metric are monitored.",
+      "Maximizing the town-wide on-time count may conflict with per-company fairness. Road priority could favor one company's robots and raise total on-time deliveries while another company's customers wait much longer.",
+      "On-time requires each leg (pickup within 120 s, delivery within 120 s) separately. A total wait under 240 s does not guarantee on-time, so option 2's level is not the same as the promise."
     ],
     "revisit": []
   }

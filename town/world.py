@@ -178,9 +178,8 @@ class Town:
         initial, self.regime_transitions = read_regimes(ir)
         self.adaptive = mode == "adaptive"
         self.regime = initial if self.adaptive else mode
-        # safety_invariant は IR に載らないので、period.compile_rules がソースから
-        # 読んで x_safety_invariants に添える（仕様の課題。README 参照）。
-        self.invariants = ir.get("x_safety_invariants") or {}
+        self.invariants = {f"{tr['from_regime']}->{tr['to_regime']}": tr["safety_invariant"]
+                           for tr in self.regime_transitions if tr.get("safety_invariant")}
         self.switching: dict | None = None
         self.switch_log: list[dict] = []
         self.regime_s = Counter()

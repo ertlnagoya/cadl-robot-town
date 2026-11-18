@@ -44,7 +44,11 @@ There are two amendment loops.
 
 Assumes Course A's setup: the CADL compiler cloned to `~/program/cadl_repo`, as in
 [Section 2.4 of the Textbook](https://www.ertl.jp/cadl-spec/docs/textbook/toolchain-setup/#24-setup-5-min),
-which also lists fixes for install problems.
+which also lists fixes for install problems. Use cadl 0.3.32 or later (checked
+with 0.3.36; see `cadl --version`): an older compiler leaves the safety invariant of a
+regime transition out of the IR, and the town refuses the rules. A rule file with
+`sos.regimes` (per-regime bindings, cadl 0.3.32) is refused too, since the town does
+not apply those bindings yet.
 
 ```bash
 cd ~/program
@@ -184,43 +188,47 @@ record anyway.
 
 ### Real LLM records
 
-The following records come from real runs with Claude Opus 5.5 on 2026-11-16 (cadl 0.3.31).
-The answers to the decision requests (`answers.yaml`) were written by Claude
-playing the human operator when the records were made.
+The steward records come from real runs with Claude Opus 5.5 on 2026-11-18 (cadl 0.3.36);
+the council record from 2026-11-16 (cadl 0.3.31). The answers to the decision requests
+(`answers.yaml`) were written by Claude playing the human operator when the records were made.
 
 | Record | Contents |
 |---|---|
-| `examples/steward-d-en/` | six periods with `kpi.en.md` (English); about 60,300 input / 48,700 output tokens |
-| `examples/steward-d/` | the same in Japanese (`kpi.md`); about 70,700 / 63,700 tokens |
+| `examples/steward-d-en/` | six periods with `kpi.en.md` (English); about 61,600 input / 51,100 output tokens |
+| `examples/steward-d/` | the same in Japanese (`kpi.md`); about 63,300 / 50,100 tokens |
 | `examples/steward-goodhart/en/` | a proxy KPI ("reduce road-rule violations"), one period, in English |
-| `examples/steward-goodhart/proxy/`, `guarded/` | the same proxy KPI in Japanese, answered two ways |
+| `examples/steward-goodhart/proxy/`, `guarded/` | the same proxy KPI in Japanese, answered two ways: the count alone, or the count with service, waits and blocked time watched |
 | `examples/llm-distributed/` | the LLM as the council of `town.council`, two periods |
 
-- Period by period (English): the vetoed `block_k 3 → 2` is adopted by the
-  human, as the LLM recommends; an uncertain tightening is kept back; nothing is
-  adopted in the busy season; after the KPI changes to fairness, the human adopts
-  `hold_limit 60s → 70s`, as the LLM recommends; a further step that lowers the
-  worst company's on-time rate is kept back against the LLM's recommendation.
-  The rules end at v3.
-- The Japanese run parts from the English one in period 1: its LLM also proposes
-  doubling the sanction weight (`sanction_lambda 0.5 → 1`), which removes every
-  late delivery and passes the vote with A and B; the human adopts it. Every later
-  proposal improves on at most 3 of 5 seeds, and the human keeps the rules in
-  every period. The rules end at v2.
-- Lighter sanctions (`1 → 0.5` in Japanese period 5, `0.5 → 0` in English period 5)
-  narrow the spread of utilities but let C (and, with no sanctions, B) wait at the
-  intersection longer; late deliveries rise and the lowest on-time rate falls below
-  the KPI condition. Neither LLM recommends them.
-- In English period 2 the LLM wrote that a proposal A and B voted for "will very
-  likely fail the 2-of-3 vote", and listed the mismatch as unknown: the
-  decision-request call is not given the constitution, so the LLM does not know the
-  quorum. In Japanese period 6 it took the constitution's `objective` for the
-  improvement gate, which `town.steward` does not use.
+- Reading the KPI: neither LLM set a target, since the KPI gives no level for
+  "waiting badly". The English LLM offered 240 s (the two promised legs added up)
+  as an option and said the human must confirm it; the human chose to watch the
+  worst company's 95th-percentile wait with no level.
+- Period 1 ends the same way in both languages. Neither LLM proposes heavier
+  sanctions; both propose `block_k 3 → 2`, which raises on-time deliveries on all 5
+  seeds and cuts the worst company's p95 wait from 273 s to 95.6 s. B and C vote it
+  down and the human adopts it against the vote. The Japanese LLM recommends it; the
+  English LLM recommends keeping the rules, since C's utility falls by a third for
+  reasons it cannot explain.
+- In Japanese period 2 the LLM wrote that adopting a proposal A and B voted for would
+  override the vote. The decision request does not include the constitution, so the
+  LLM does not know the quorum.
+- Period 5 parts the two runs. `hold_limit 60s → 70s` narrows the spread of utilities
+  by 1.7 in both. The Japanese reading of the new KPI still watches the worst company's
+  p95 wait, which the change lengthens from 178 s to 212 s, and the human keeps the
+  rules. The English reading does not watch it; the LLM recommends the change and the
+  human adopts it (v3). In English period 6 both proposals lower the worst company's
+  on-time rate, and the human keeps the rules.
+- Removing sanctions (`sanction_lambda 0.5 → 0`) and returning to `block_k 3` narrow
+  the spread most, but raise late deliveries and lower the worst company's on-time
+  rate. Neither LLM recommends them; of removing sanctions, the English LLM wrote that
+  it narrows the gap "by switching off the measurement of road misuse".
 - With the proxy KPI, the Japanese LLM proposed both the heavier sanction weight and
   a loosening (`hold_limit 60s → 70s`); both cut the count from 25.8 to 23.6, but
-  only the first cuts blocked time. The LLM flagged the loosening for the human and
-  recommended the sanctions; the English LLM proposed only the sanctions, which were
-  adopted automatically.
+  only the first cuts blocked time. Even when the human made the count the only goal,
+  the LLM flagged the loosening for the human and recommended the sanctions. With
+  service watched, and in English, the LLM proposed the sanctions and `block_k 3 → 2`,
+  and the sanctions were adopted automatically.
 
 The hand-written sample in `examples/llm-replay/` has had lines inserted
 mechanically when the starting rules changed (two AMEND steps on 2026-10-19,
