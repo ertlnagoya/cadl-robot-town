@@ -61,7 +61,8 @@ KPI_SCHEMA = {
                     "label": {"type": "string"},
                     "goals": {"type": "array", "items": {
                         "type": "object",
-                        "properties": {"metric": METRIC, "text": {"type": "string"}},
+                        "properties": {"metric": METRIC, "target": {"type": "number"},
+                                       "text": {"type": "string"}},
                         "required": ["metric", "text"], "additionalProperties": False}},
                     "guards": {"type": "array", "items": {
                         "type": "object",
@@ -92,7 +93,12 @@ KPI_SYSTEM = ROLES + f"""
 {kpi.catalogue()}
 
 評価方法は goals（先頭が主目標。改善はこれで測ります。2 番目以降は悪化を監視する目標）と
-guards（改正後に必ず守る条件）からなります。
+guards（改正後に必ず守る条件）からなります。goals の target は達成基準（その値に届けば
+達成）で、向きは指標で決まります（大きいほどよい指標は以上、小さいほどよい指標は以下）。
+
+- KPI の文に達成の水準（「95% 以上」「4 分以内」など）が書かれていれば、target か guards の
+  value にそのまま入れてください。書かれていない水準を、あなたが決めてはいけません。
+  水準が要るのに書かれていなければ、水準の異なる options を示すか、target を省いてください。
 
 - KPI の読み方が 1 通りに定まり、懸念もなければ、options を 1 つだけ返し、concerns と
   revisit を空にしてください。そのときは人間に確かめずに使われます。

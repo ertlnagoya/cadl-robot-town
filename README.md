@@ -128,6 +128,46 @@ proxy, or undercuts earlier decisions. Every decision goes to `decisions.md` and
 later periods. `--lang en` makes the text shown to the human, and the LLM's
 writing, English (KPIs in `kpi.en.md`, headings `## From period k`).
 
+### Writing the measure and the targets yourself
+
+A KPI in prose alone does not say what to measure or when it is met. Add an
+`Evaluation:` list to a section of the KPI file and `town.steward` uses it as the
+measure as is, without asking the LLM to read the KPI (Japanese example:
+`examples/kpi-written/kpi.md`).
+
+```markdown
+## From period 1
+
+Deliver at least 95% of orders on time across the town. In every company, no more
+than 5% of customers should wait longer than the 240 s the contract allows.
+
+Evaluation:
+- goal: on_time_rate >= 0.95
+- watch: worst_company_p95_wait_s <= 240
+- guard: min_company_on_time_rate >= 0.8
+```
+
+- `goal` (exactly one) is the main goal that improvements are measured by; `watch`
+  goals ask the human when they get worse; `guard` lines need a value and must hold
+  after every amendment. A value on a goal or watch line is its target. Write
+  `>=` for metrics where larger is better and `<=` for the others (otherwise the
+  run stops with an error); `95%` also works. In Japanese the keywords are
+  `評価方法:`, `主目標`, `監視`, `条件`, and metrics may be written by their short
+  Japanese names.
+- Waiting time is the seconds from order to delivery; an order still open at the
+  end of the period counts the seconds until then. The metrics are `p95_wait_s`,
+  `max_wait_s` and `worst_company_p95_wait_s`; `on_time_rate` is the town-wide
+  on-time rate.
+- Each period reports, for the current rules, whether every target and guard is met
+  ("KPI attainment") in the terminal, `decisions.md` and `p<k>-evidence.md`; the
+  table of proposals (in `p<k>-evidence.md` and the decision request) marks, for each
+  proposal, whether the targets and guards would be met. Targets
+  are for reporting; they do not change which amendments are adopted.
+- Sections without the list are read by the LLM as before; the LLM may also set
+  `target`, but is told not to invent a level the KPI does not state.
+
+`python -m town.kpi [file]` lists the metrics and shows how each section is read.
+
 ```bash
 python -m town.steward --lang en --mode DISTRIBUTED --rounds 6 --name kpi-d-en   # calls the LLM; answer in the terminal
 python -m town.steward --lang en --mode DISTRIBUTED --rounds 6 --name kpi-d-en \

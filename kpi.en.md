@@ -5,6 +5,10 @@ Written by a human (the operator of the town's delivery service) in natural lang
 as the KPI of period k, the section whose "## From period k" heading has the largest number
 not above k. You may edit it between periods.
 
+You may also add the measure and its targets as an `Evaluation:` list (see "Writing the
+measure and the targets yourself" in the README). The sections below are deliberately prose
+only, so the LLM offers readings and asks the human.
+
 ## From period 1
 
 Deliver as many orders as possible across the town within the times we promised customers

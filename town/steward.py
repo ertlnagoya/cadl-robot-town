@@ -198,7 +198,7 @@ def reason_text(c: Cand, spec: dict) -> str:
     for r in c.reasons:
         if r == "合意":
             no = M("and").join(k for k in sorted(c.votes) if not c.votes[k])
-            out.append(M("r_agree", metric=primary, gain=c.gain, no=no))
+            out.append(M("r_agree", metric=primary, gain=kpi.fmt_gain(primary, c.gain), no=no))
         elif r == "契約":
             out.append(M("r_contract"))
         elif r == "規制":
@@ -207,9 +207,9 @@ def reason_text(c: Cand, spec: dict) -> str:
             out.append(M("r_safety"))
         elif r == "KPI の衝突":
             why = c.kpi_why or M("comma").join(M("r_worse", m=w) for w in c.worse)
-            out.append(M("r_conflict", gain=c.gain, why=why))
+            out.append(M("r_conflict", gain=kpi.fmt_gain(primary, c.gain), why=why))
         elif r == "不確か":
-            out.append(M("r_uncertain", gain=c.gain, n=c.seeds_better, total=len(c.m["runs"])))
+            out.append(M("r_uncertain", gain=kpi.fmt_gain(primary, c.gain), n=c.seeds_better, total=len(c.m["runs"])))
         elif r == "LLM":
             out.append(M("r_llm", text=c.llm_flag))
     return M("sep").join(out)
@@ -221,10 +221,12 @@ def table(cur: dict, cur_vals: dict, cands: list[Cand], spec: dict) -> str:
     head = M("t_head", metric=primary)
     utils = lambda m: " / ".join(f"{m['companies'][x]['utility']:.1f}" for x in sorted(m["companies"]))
     # 監視する目標と KPI の条件の指標は、値を 1 列にまとめて見せる（表の固定の列にないものも）
-    watch = list(dict.fromkeys([g["metric"] for g in spec["goals"][1:]]
+    # 達成基準のある主目標も入れ、達成基準と条件には、届いているかを添える
+    targeted = [g["metric"] for g in spec["goals"][:1] if g.get("target") is not None]
+    watch = list(dict.fromkeys(targeted + [g["metric"] for g in spec["goals"][1:]]
                                + [g["metric"] for g in spec.get("guards") or []]))
-    fmt_v = lambda n, x: f"{x:.2f}" if n.endswith("rate") or n == "on_time_rate_gap" else f"{x:.1f}"
-    watched = lambda vals: M("comma").join(f"{n} {fmt_v(n, vals[n])}" for n in watch)
+    watched = lambda vals: M("comma").join(f"{n} {kpi.fmt(n, vals[n])}{kpi.mark(spec, n, vals[n], M)}"
+                                           for n in watch)
     if watch:
         head = head.replace(" | 備考 |", f" | {M('t_watch')} | 備考 |").replace(" | notes |", f" | {M('t_watch')} | notes |")
     extra = lambda vals: f" {watched(vals)} |" if watch else ""
@@ -248,7 +250,7 @@ def table(cur: dict, cur_vals: dict, cands: list[Cand], spec: dict) -> str:
                                          if c.worse else "") if x)
         rows.append(f"| {c.cid} | {label} | {layer} | ○ | {mark(c.gates['inv'])} "
                     f"| {v['on_time_deliveries']:.1f} | {v['late_deliveries']:.1f} | {v['blocked_s']:.0f} "
-                    f"| {v['road_violations']:.1f} | {v['min_company_on_time_rate']:.2f} | {c.gain:+.1f} "
+                    f"| {v['road_violations']:.1f} | {v['min_company_on_time_rate']:.2f} | {kpi.fmt_gain(primary, c.gain)} "
                     f"| {c.seeds_better}/{len(c.m['runs'])} | {mark(c.gates['kpi_guard'])} | {utils(c.m)} "
                     f"| {votes} |{extra(v)} {note} |")
     return "\n".join(rows)
@@ -369,7 +371,24 @@ def main() -> int:
 
         # 1. KPI
         since, new_kpi = kpi.load(kpi_path, k)
-        if new_kpi != kpi_text:
+        wspec, bad = kpi.written(new_kpi) if new_kpi != kpi_text else (None, "")
+        if bad:
+            finish()
+            raise SystemExit(M("kpi_bad", since=since, why=bad))
+        if wspec:
+            # 人間が評価方法を書いた節は、そのまま使う（LLM に読み方を頼まない）
+            shown = kpi.prose(new_kpi)
+            print(M("kpi_line", since=since, text=shown))
+            spec = wspec
+            print(M("kpi_written", desc=kpi.describe(spec, M)))
+            md += [M("kpi_sec", k=k, since=since, how=M("written")), M("md_kpi", text=shown),
+                   M("md_written", desc=kpi.describe(spec, M)), ""]
+            kpi_goal = gsn.add("goal", M("gsn_kpi", since=since, text=shown), gsn.by_version)
+            gsn.add("context", M("gsn_measure", who=M("by_written"), desc=kpi.describe(spec, M)), kpi_goal)
+            log.append({"id": f"K{k}", "period": k, "who": M("human"),
+                        "summary": M("log_kpi", text=shown[:60], desc=kpi.describe(spec, M)), "reason": ""})
+            revisit, kpi_text = "", new_kpi
+        elif new_kpi != kpi_text:
             print(M("kpi_line", since=since, text=new_kpi))
             data, note = rec.get(f"p{k}-kpi", llm_steward.kpi_request(new_kpi, since, kpi_text,
                                                                       decisions_brief(log), args.lang))
@@ -436,10 +455,15 @@ def main() -> int:
         print(M("current", on=cur_vals["on_time_deliveries"], late=cur_vals["late_deliveries"],
                 blk=cur_vals["blocked_s"], road=cur_vals["road_violations"], metric=primary,
                 val=cur_vals[primary]))
+        ach = kpi.achievement(spec, cur_vals, M)
+        if ach:
+            print(M("achieved", text=ach))
 
         # 3. LLM が改正案を出し、判定にかけて測る
         req = llm_steward.propose_request(
-            kpi_text, spec, MODE_NOTE[args.mode], env, _observation(cur), "".join(history),
+            kpi_text, spec, MODE_NOTE[args.mode], env,
+            _observation(cur) + "\n" + M("t_metrics") + M("comma").join(
+                f"{n} {kpi.fmt(n, x)}" for n, x in cur_vals.items()), "".join(history),
             decisions_brief(log), revisit,
             const_text if const_version == 1 else yaml.safe_dump(const, allow_unicode=True, sort_keys=False),
             text, args.lang)
@@ -464,7 +488,8 @@ def main() -> int:
         best, escalated = triage(cands, spec)
         evidence = table(cur, cur_vals, cands, spec)
         (run_dir / f"p{k}-evidence.md").write_text(
-            M("evidence_head", k=k, label=label(env), desc=kpi.describe(spec, M)) + evidence + "\n"
+            M("evidence_head", k=k, label=label(env), desc=kpi.describe(spec, M))
+            + (M("ev_ach", text=ach) if ach else "") + evidence + "\n"
             + "".join("\n" + M("item", id=c.cid, label=c.title, text=c.rationale) for c in cands) + "\n",
             encoding="utf-8")
         print("  " + evidence.replace("\n", "\n  "))
@@ -472,6 +497,8 @@ def main() -> int:
         # 4. 自動で採択するか、人間に判断を求めるか
         md.append(M("d_sec", k=k, label=label(env), how=M("asked") if escalated else M("auto")))
         md.append(M("md_measure", desc=kpi.describe(spec, M)))
+        if ach:
+            md.append(M("md_ach", text=ach))
         md.append(M("md_assess", text=data["assessment"] or M("none")))
         md.append(M("md_evidence", k=k))
         ans = None
@@ -530,7 +557,7 @@ def main() -> int:
             (run_dir / f"v{version}.cadl").write_text(text, encoding="utf-8")
             yes = "".join(x for x in sorted(chosen.votes) if chosen.votes[x]) or M("nobody")
             what = M("adopted", v=version, label=chosen.label, layer=M("layer")[chosen.layer],
-                     gain=chosen.gain, yes=yes)
+                     gain=kpi.fmt_gain(spec["goals"][0]["metric"], chosen.gain), yes=yes)
             if not chosen.gates["vote"]:
                 what += M("override")
         elif chosen is not None:

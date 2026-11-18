@@ -124,6 +124,14 @@ def _contract(ir: dict, cid: str) -> dict:
     return next(c for c in ir["institution"]["contracts"] if c["id"] == cid)
 
 
+def percentile(xs: list[float], q: float) -> float:
+    """q パーセンタイル（最近傍順位法）。空なら 0。"""
+    if not xs:
+        return 0
+    xs = sorted(xs)
+    return xs[max(0, int(-(-len(xs) * q // 100)) - 1)]
+
+
 @dataclass
 class Order:
     oid: str
@@ -195,6 +203,7 @@ class Town:
         ]
         self.stopped: dict[int, str] = {}    # ノード → そこに止まっているロボット
         self.orders = self._make_orders()
+        self.done_at: dict[str, int] = {}          # 注文ごとの、届けた時刻（約束に遅れても数える）
         self.queue: dict[str, list[Order]] = {c: [] for c in GARAGE}
         self.order_of_inst: dict[str, Order] = {}
         self.owner: dict[str, str] = {}      # 契約インスタンス → 会社
@@ -375,6 +384,7 @@ class Town:
         else:
             if self._state(o.oid) == "PickedUp":
                 self._fire("DELIVERY_SLA", "dropoff", o.oid, t)
+            self.done_at[o.oid] = t
             r.order = None
             self._idle(r, t)
 
@@ -518,6 +528,11 @@ class Town:
             violations[rec["detected_by"]] += 1
             if rec["contract_id"] == "ROAD_USE":
                 per[self.owner[rec["instance_id"]]]["sanction"] += lam * SEVERITY_POINTS[rec["severity"]]
+        # 待ち時間：注文から届くまでの秒数。期の終わりに届いていない注文は、
+        # 期の終わりまでの秒数（実際の待ち時間の下限）で数える。
+        waits = {c: [] for c in GARAGE}
+        for o in self.order_of_inst.values():
+            waits[o.company].append(self.done_at.get(o.oid, self.period_s) - o.t)
         companies = {}
         for c, m in per.items():
             orders = m["orders"] or 1
@@ -531,6 +546,8 @@ class Town:
                 "blocked_s": self.blocked_s[c],
                 "sanction": m["sanction"],
                 "utility": m["on_time"] - m["sanction"],
+                "p95_wait_s": percentile(waits[c], 95),
+                "max_wait_s": max(waits[c], default=0),
             }
         total = sum(self.regime_s.values()) or 1
         return {
@@ -543,6 +560,8 @@ class Town:
             "orders": sum(m["orders"] for m in companies.values()),
             "unfinished": sum(m["unfinished"] for m in companies.values()),
             "blocked_s": sum(self.blocked_s.values()),
+            "p95_wait_s": percentile([w for ws in waits.values() for w in ws], 95),
+            "max_wait_s": max((w for ws in waits.values() for w in ws), default=0),
             "violations": dict(violations),
             "companies": companies,
         }
