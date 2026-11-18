@@ -1,39 +1,34 @@
 {
-  "note": "claude-opus-5-5、入力 2814 / 出力 1954 トークン",
-  "request_digest": "c46035b8eb9f153a",
+  "note": "claude-opus-5-5、入力 2573 / 出力 1888 トークン",
+  "request_digest": "bbce03b6ad7ff218",
   "data": {
-    "question": "Should we adopt rule change 1 (block_k 2 → 1) against B's and C's votes, adopt regulation change R1 (raise the constitutional floor min_company_on_time_rate from 0.6 to 0.65), or keep the current rules (v2)?",
-    "background": "Change 1 passes check and the constitution, but its gain is uncertain: +1.2 on-time deliveries on average, with only 2 of 5 seeds improving. It would very likely fail the vote (A ○, B ○, C ×), so adopting it would be a second override, and it shifts cost onto C, whose utility you asked to re-measure after D1. R1 changes the constitution, which only a human may decide; the current rules already meet the new floor.",
+    "question": "Should we adopt rule change 2 (block_k 2 → 1), which passes the vote but leaves C as the only company against it and has an uncertain gain, or keep the rules at v2 for this period?",
+    "background": "Change 2 raises on_time_deliveries by +1.2 on average, but only 2/5 seeds improve, and only about 4 late deliveries remain to recover (4.2 now). The prior expectation was that this step would fail the 2-of-3 vote and need another override. The measured votes are A ○, B ○, C ×, so it would pass, but C would be outvoted again and its utility would fall from 56.3 to 40.1. In D1 you asked us to re-measure C's utility and the road violations before going further, so the trade-off between a small, uncertain town-wide gain and a large burden on one company is yours to make, not ours.",
     "options": [
       {
-        "id": "1",
-        "summary": "Evict any parked robot as soon as one robot is waiting behind it. Measured: on-time 225.0 (vs 223.8), late 3.0 (vs 4.2), blocked s 130 (vs 936), road violations 29.8 (vs 28.0), lowest on-time rate 0.98 (vs 0.97), change in on_time_deliveries +1.2, seeds improved 2/5, KPI conditions ○. Utility A / B / C 73.4 / 74.2 / 40.1 (vs 73.4 / 65.5 / 56.3). Vote A ○, B ○, C ×. Note: the earlier reason text expected B to oppose, but the table shows B voting ○. With C alone opposed, adoption would depend on how the 2-of-3 vote is counted; if it does not pass, adoption would be a second override.",
-        "stakeholders": "Gains: B (utility 65.5 → 74.2). Customers gain slightly: on-time rises by 1.2 and late falls by 1.2 on average, but most seeds do not improve. A: unchanged (73.4). Loses: C (utility 56.3 → 40.1) through more eviction penalties. Road safety is slightly worse (violations 28.0 → 29.8). Trust in the voting process may suffer if this becomes a second override."
-      },
-      {
-        "id": "R1",
-        "summary": "Raise the constitutional floor min_company_on_time_rate from 0.6 to 0.65. Passes the constitution check, and the current rules already meet it (lowest on-time rate 0.97), so no measured outcome changes now. Its only effect is to forbid future rule changes that would push any company below 0.65.",
-        "stakeholders": "Customers of the worst-served company gain a stronger guarantee in future periods. Companies lose some freedom to propose rules that trade one company's on-time rate for town-wide throughput. No one gains or loses anything this period."
+        "id": "2",
+        "summary": "Adopt block_k 2 → 1. On-time deliveries go from 223.8 to 225.0 (+1.2, improved on 2/5 seeds) and late deliveries from 4.2 to 3.0. Blocked time falls from 936 s to 130 s. worst_company_p95_wait_s falls from 109 to 92.4, and the lowest on-time rate rises from 0.97 to 0.98. Road violations rise from 28.0 to 29.8, and C's utility drops from 56.3 to 40.1. Votes are A ○, B ○, C ×, so the change passes 2-of-3 without an override. Check, constitution and KPI conditions all pass.",
+        "stakeholders": "B gains most (utility 65.5 → 74.2) and A is unchanged (73.4). C loses heavily (56.3 → 40.1) and likely faces more sanctions, since road violations rise. Customers of the worst-served company wait less at p95 (109 → 92.4 s), and town-wide about 1 more order per period arrives on time. That customer gain is not reliable across seeds."
       },
       {
         "id": "keep",
-        "summary": "Stay at v2. On-time 223.8, late 4.2, blocked s 936, road violations 28.0, lowest on-time rate 0.97, utility A / B / C 73.4 / 65.5 / 56.3. KPI condition (>= 0.7) is met.",
-        "stakeholders": "C keeps its current utility (56.3), and no override is needed. B forgoes a gain of 8.7 utility. Customers forgo a small and uncertain gain (about 1.2 more on-time and 1.2 fewer late deliveries on average). Blocking time stays high (936 s)."
+        "summary": "Stay at v2. On-time deliveries stay at 223.8, late deliveries at 4.2 and worst_company_p95_wait_s at 109. Unfinished stays at 0.0, road violations at 28.0, and utilities stay at 73.4 / 65.5 / 56.3. This leaves time to do the re-measurement of C and road violations that D1 asked for, and to test change 2 on more seeds.",
+        "stakeholders": "C avoids a 16-point utility loss and further sanctions. B gives up a gain of about 8.7 utility. Customers keep the current service: 0.97 lowest on-time rate and a 109 s worst-company p95 wait. Both are already within the 120 s promise, but they forgo a small, uncertain improvement."
       }
     ],
     "recommendation": {
       "id": "keep",
-      "reason": "Change 1's gain is small and unreliable (+1.2, only 2/5 seeds improve) and may not be a real improvement. Its cost to C is large and certain (utility 56.3 → 40.1), and road violations rise (28.0 → 29.8). It is also unclear whether it would pass the vote or require a second override. Service is already strong: lowest on-time rate 0.97, unfinished 0.0. R1 is harmless but changes nothing now. You said in D1 that it can wait, so it can be adopted separately later if you want to lock in the floor."
+      "reason": "The main-goal gain is small (+1.2) and not robust (only 2/5 seeds), while the cost to C is large and certain in the measurement (56.3 → 40.1) and road violations rise again (28.0 → 29.8). D1 asked to re-measure C's burden before going further. Current service already meets the promise for most orders (0.97 lowest on-time rate, p95 wait 109 s, 0 unfinished). Re-measuring change 2 on more seeds first gives a sounder basis than adopting it now. If you weigh the worst-company wait reduction (109 → 92.4 s) heavily, option 2 is defensible and passes the vote on its own."
     },
     "unknowns": [
-      "Whether change 1 would actually pass the 2-of-3 vote: the table shows A ○, B ○, C ×, which contradicts the earlier expectation that B and C would both oppose.",
-      "Why C's utility on the current rules is 56.3 now, versus 19.0 recorded after D1 (different measurement scale, or a real recovery?).",
-      "Whether the +1.2 gain from change 1 holds with more seeds, or is noise.",
-      "How each company will change its behavior (parking, holding, routing) if eviction becomes stricter.",
-      "How customers perceive the remaining late deliveries (about 4 per run) and the occasional long waits.",
-      "Next period's demand level and mix across companies, which could make blocking matter more or less.",
-      "Whether the KPI floor of 0.7 (provisional per K1) will be revised, and how it should relate to the constitutional floor in R1.",
-      "Why road violations are rising (28.0 now, 29.8 under change 1); the D1 re-measurement request has not been fully explained."
+      "Whether the +1.2 gain holds with more than 5 seeds, or is noise.",
+      "Why C's utility stands at 56.3 now when D1 recorded 28.8 → 19.0, i.e. whether the utility scale or measurement changed between periods.",
+      "How C will respond to repeated losses and being outvoted (e.g. changed routing, more violations, or leaving).",
+      "Which sanctions C's added road violations would trigger and what they would cost.",
+      "How customers perceive a p95 wait of 109 s versus 92.4 s, given the 120 s promise.",
+      "What the KPI means by 'kept waiting badly'; no threshold has been set yet (K1 deferred it).",
+      "Next period's demand level and mix across companies, which could change the size of the gain.",
+      "Whether intermediate settings or other rules (e.g. hold_limit, mode transitions) could get the wait reduction with less cost to C."
     ]
   }
 }

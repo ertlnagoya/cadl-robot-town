@@ -44,15 +44,18 @@ def compile_rules(path: Path) -> dict:
         read_regimes(doc)
     except (KeyError, StopIteration, TypeError, ValueError, IndexError) as e:
         raise CompileError(f"IR に規則の値がそろっていません（{type(e).__name__}: {e}）")
-    # cadl 0.3.31 の sim-ir も sos.transitions[*].safety_invariant を IR に出力しない
-    # （cadl check は式として検査する）。切替の安全条件を判定するため、検査を通った
-    # ソースから読んで添える。
+    # cadl 0.3.32 から、sim-ir は sos.transitions[*].safety_invariant を IR に書く。
+    # それより古い cadl では、検査を通った安全条件が IR から抜けるので却下する。
     src = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-    doc["x_safety_invariants"] = {
-        f"{tr['from']}->{tr['to']}": tr["safety_invariant"]
-        for tr in (src.get("sos", {}).get("transitions") or [])
-        if tr.get("safety_invariant")
-    }
+    written = sum(1 for tr in (src.get("sos", {}).get("transitions") or [])
+                  if tr.get("safety_invariant"))
+    if written != sum(1 for tr in doc["transitions"] if tr.get("safety_invariant")):
+        raise CompileError("IR に切替の安全条件（safety_invariant）がない。"
+                           "cadl 0.3.32 以降を使う")
+    # 運用モードごとの値と契約の束縛（sos.regimes、cadl 0.3.32）は、街のシミュレータが
+    # まだ当てはめない。黙って無視せずに却下する。
+    if "regimes" in doc:
+        raise CompileError("sos.regimes（運用モードごとの束縛）は、この街ではまだ扱えない")
     return doc
 
 
