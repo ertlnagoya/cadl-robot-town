@@ -1,4 +1,4 @@
-# CADL Robot Town — rules that a community amends itself (Course D)
+# CADL Robot Town: rules that a community amends itself (Course D)
 
 English | [日本語](README.ja.md)
 
@@ -89,14 +89,14 @@ numbers, are in [README.ja.md](README.ja.md) and on the hands-on page.
   who gain from waiting on the road, in every period.
 - **Demand**: after period 1 only small `hold_limit` steps pass in the busy
   season, and nothing improves the goal in the quiet season.
-- **Goodhart drift**: with the objective "fewer road-rule violations", the
+- **Goodhart's law**: with the objective "fewer road-rule violations", the
   rules loosen period after period; counted violations fall while blocked time
   and late deliveries rise by about half. Heavier sanctions also reduce the count
   in every period, but a loosening reduces it as much or more, and C always votes
   against heavier sanctions. The rules of the on-time objective, which doubled the
   sanctions, end with fewer road violations (19.8) than the loosened ones (21.0).
-- **Operating modes**: CENTRALIZED wins except at very high demand; with a
-  mid-period rush, switching beats both fixed modes. Switching without waiting
+- **Operating modes**: CENTRALIZED delivers more on time except at very high
+  demand; with a mid-period rush, switching delivers more on time than either fixed mode. Switching without waiting
   for the road to clear breaks the safety invariant.
 - **LLM council**: Claude's proposals all pass the check and the constitution
   (on 2026-11-16: `block_k 3 → 2` and `hold_limit 60s → 50s`), but none is
@@ -119,15 +119,16 @@ numbers, are in [README.ja.md](README.ja.md) and on the hands-on page.
   never from the LLM's text.
 
 `town/steward.py` does not adopt automatically, and asks the human, when a
-proposal is vetoed although it beats every adoptable one (agreement); changes
+proposal is vetoed although it improves the KPI more than every proposal that could be
+adopted automatically (agreement); changes
 the regulation; changes the contract or an operating-mode threshold while
 improving the KPI and keeping the invariants (a contract proposal that does not
-improve the KPI reaches the human only if the LLM asks); improves the main KPI
+improve the KPI is put to the human only if the LLM asks); improves the main KPI
 while breaking a KPI condition or worsening a watched goal (KPI conflict);
 improves on fewer than 4 of 5 seeds (uncertain); or when the LLM itself says a
 human should decide (for proposals that keep the invariants). A new KPI is
 confirmed with the human when it can be read in more than one way, relies on a
-proxy, or undercuts earlier decisions. Every decision goes to `decisions.md` and
+proxy, or removes a premise of an earlier decision. Every decision goes to `decisions.md` and
 `gsn.yaml` (diagram in `gsn.md`) in `runs/<name>/`, and is passed to the LLM in
 later periods. `--lang en` makes the text shown to the human, and the LLM's
 writing, English (KPIs in `kpi.en.md`, headings `## From period k`).
@@ -213,7 +214,7 @@ the council record from 2026-11-16 (cadl 0.3.31). The answers to the decision re
 - In Japanese period 2 the LLM wrote that adopting a proposal A and B voted for would
   override the vote. The decision request does not include the constitution, so the
   LLM does not know the quorum.
-- Period 5 parts the two runs. `hold_limit 60s → 70s` narrows the spread of utilities
+- The two runs decide differently in period 5. `hold_limit 60s → 70s` narrows the spread of utilities
   by 1.7 in both. The Japanese reading of the new KPI still watches the worst company's
   p95 wait, which the change lengthens from 178 s to 212 s, and the human keeps the
   rules. The English reading does not watch it; the LLM recommends the change and the
