@@ -28,6 +28,7 @@
      - 不確か   ：判定はすべて通るが、改善したシードが 8 割に満たない
      - LLM      ：LLM 自身が、人間の判断が要ると書いた
   5. 判断と理由を decisions.md と gsn.yaml（図は gsn.md）に残し、次の期の LLM に渡す。
+     同じ記録を、機械で読める証拠 evidence.json（town/evidence.py）にも残す。
 
 判断要求への答えは、端末で打ち込むか、--answers の YAML に書く。
 端末がなく答えもないときは、判断要求を p<k>-request.md に書き出して止まる。
@@ -45,9 +46,10 @@ from pathlib import Path
 
 import yaml
 
+from . import evidence as ev
 from . import kpi, llm_steward
 from .council import ballots, check_amendment, fmt, invariants_ok, read_params
-from .llm_council import MODE_NOTE, _observation
+from .llm_council import MODE_NOTE, MODEL, _observation
 from .period import (CONSTITUTION, DEFAULT_RULES, ROOT, SCENARIO, CompileError, compile_rules,
                      evaluate)
 from .messages import Messages
@@ -346,6 +348,14 @@ def main() -> int:
     rec = llm_steward.Recorder(run_dir, args.llm, args.replay_dir, M)
     answers = Answers(args.answers, run_dir / "answers.yaml")
     gsn = Gsn(M)
+    import cadl
+    evid = ev.Evidence(run_dir, {
+        "name": args.name, "tool": "town.steward", "mode": args.mode, "lang": args.lang,
+        "rounds": args.rounds, "llm": args.llm, "model": MODEL,
+        "replay_dir": str(args.replay_dir) if args.replay_dir else None,
+        "cadl": getattr(cadl, "__version__", None)},
+        {"rules": args.rules, "constitution": CONSTITUTION, "scenario": SCENARIO, "kpi": kpi_path,
+         **({"answers": args.answers} if args.answers else {})})
     text = args.rules.read_text(encoding="utf-8")
     version, const_version = 1, 1
     (run_dir / "v1.cadl").write_text(text, encoding="utf-8")
@@ -360,9 +370,11 @@ def main() -> int:
         gsn.save(run_dir / "gsn.yaml")
         (run_dir / "decisions.md").write_text("\n".join(md) + "\n", encoding="utf-8")
         (run_dir / "history.md").write_text(M("history_title") + "".join(history), encoding="utf-8")
+        evid.save(gsn.nodes)                    # 最後に：ほかのファイルのハッシュを残すため
 
     for k in range(1, args.rounds + 1):
         env = periods[(k - 1) % len(periods)]
+        v_before, cv_before, rdata = version, const_version, None
         seeds = [s + env["seed_offset"] for s in const["seeds"]]
         sim = dict(seeds=seeds, period_s=const["period_s"], order_interval_s=env["order_interval_s"],
                    mode=args.mode, rush=env.get("rush"))
@@ -383,7 +395,10 @@ def main() -> int:
             print(M("kpi_written", desc=kpi.describe(spec, M)))
             md += [M("kpi_sec", k=k, since=since, how=M("written")), M("md_kpi", text=shown),
                    M("md_written", desc=kpi.describe(spec, M)), ""]
-            kpi_goal = gsn.add("goal", M("gsn_kpi", since=since, text=shown), gsn.by_version)
+            kpi_goal = gsn.add("goal", M("gsn_kpi", since=since, text=shown), gsn.by_version, ref=f"K{k}")
+            evid.add({"id": f"K{k}", "type": "kpi", "period": k, "since": since, "text": shown,
+                      "how": "written", "measure": spec, "measure_text": kpi.describe(spec, M),
+                      "decision": {"by": "human", "choice": None, "reason": None, "assumptions": []}})
             gsn.add("context", M("gsn_measure", who=M("by_written"), desc=kpi.describe(spec, M)), kpi_goal)
             log.append({"id": f"K{k}", "period": k, "who": M("human"),
                         "summary": M("log_kpi", text=shown[:60], desc=kpi.describe(spec, M)), "reason": ""})
@@ -437,7 +452,21 @@ def main() -> int:
             else:
                 ans, spec = None, dict(opts[0][1])
             md.append("")
-            kpi_goal = gsn.add("goal", M("gsn_kpi", since=since, text=new_kpi), gsn.by_version)
+            kpi_goal = gsn.add("goal", M("gsn_kpi", since=since, text=new_kpi), gsn.by_version, ref=f"K{k}")
+            evid.add({"id": f"K{k}", "type": "kpi", "period": k, "since": since, "text": new_kpi,
+                      "how": "llm", "interpretation": data["interpretation"],
+                      "options": [{"id": i, "label": o["label"], "measure_text": kpi.describe(o, M),
+                                   "note": o["note"]} for i, o in opts],
+                      "concerns": data["concerns"], "revisit": data["revisit"],
+                      "recommended": str(data["recommended"]),
+                      "measure": spec, "measure_text": kpi.describe(spec, M),
+                      "llm_record": f"llm/p{k}-kpi.json",
+                      "request_file": f"p{k}-kpi-request.md" if ask else None,
+                      "decision": {"by": "human" if ans else "tool",
+                                   "choice": ans["choice"] if ans else opts[0][0],
+                                   "followed_llm": (ans["choice"] == str(data["recommended"])) if ans else None,
+                                   "reason": (ans or {}).get("reason") or None,
+                                   "assumptions": (ans or {}).get("assumptions") or []}})
             gsn.add("context", M("gsn_measure", who=M("by_human") if ans else M("by_llm"),
                                  desc=kpi.describe(spec, M)), kpi_goal)
             if ans:
@@ -578,13 +607,46 @@ def main() -> int:
             for g in ans.get("gsn") or []:
                 md.append(M("md_gsn", type=g["type"], text=g["text"]))
         md.append("")
-        s = gsn.add("strategy", M("gsn_s", k=k, what=what), kpi_goal)
-        gsn.add("solution", M("gsn_sn", k=k), s)
+        s = gsn.add("strategy", M("gsn_s", k=k, what=what), kpi_goal, ref=f"D{k}")
+        gsn.add("solution", M("gsn_sn", k=k), s, file=f"p{k}-evidence.md")
         gsn.add("context", M("gsn_c", k=k, label=label(env), interval=env["order_interval_s"]), s)
         if ans:
             attach_answer(gsn, s, ans)
         else:
             gsn.add("justification", M("gsn_j_auto") if chosen else M("gsn_j_none"), s, by="tool")
+        reco = (rdata or {}).get("recommendation") or {}
+        choice = ans["choice"] if ans else (chosen.cid if chosen else KEEP)
+        evid.add({
+            "id": f"D{k}", "type": "decision", "period": k,
+            "env": {"label": label(env), "order_interval_s": env["order_interval_s"], "rush": env.get("rush"),
+                    "seeds": seeds},
+            "kpi": next(r["id"] for r in reversed(evid.doc["records"]) if r["type"] == "kpi"),
+            "version_in_force": v_before, "constitution_version": cv_before,
+            "current": {"metrics": ev.rounded(cur_vals), "utility": ev.utilities(cur)},
+            "achievement": ach or None,
+            "assessment": data["assessment"] or None,
+            "candidates": [ev.candidate(c, reason_text(c, spec) if c.reasons else "") for c in cands],
+            "auto_best": best.cid if best else None,
+            "escalated": [c.cid for c in escalated],
+            "request": None if not escalated else {
+                "question": rdata["question"], "recommendation": reco.get("id"),
+                "recommendation_reason": reco.get("reason"), "unknowns": rdata["unknowns"],
+                "options": rdata["options"], "file": f"p{k}-request.md",
+                "llm_record": f"llm/p{k}-request.json"},
+            "llm_record": f"llm/p{k}-propose.json", "evidence_file": f"p{k}-evidence.md",
+            "decision": {
+                "by": "human" if ans else "tool", "choice": choice, "outcome": what,
+                "adopted": chosen.cid if chosen else None,
+                "adopted_kind": chosen.kind if chosen else None,
+                "vote_overridden": bool(chosen is not None and chosen.kind == "amend"
+                                        and not chosen.gates.get("vote")),
+                "followed_llm": (choice == str(reco.get("id"))) if ans and reco else None,
+                "reason": (ans or {}).get("reason") or None,
+                "assumptions": (ans or {}).get("assumptions") or [],
+                "gsn": (ans or {}).get("gsn") or [],
+                "version_after": version, "constitution_version_after": const_version,
+                "version_file": f"v{version}.cadl" if version != v_before else None},
+        })
         log.append({"id": f"D{k}", "period": k, "who": who, "summary": what,
                     "reason": (ans or {}).get("reason", "")})
         for f in run_dir.glob(f"p{k}-*.cadl"):          # 不採択の案は消し、採択したバージョンだけを残す
