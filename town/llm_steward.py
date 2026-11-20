@@ -156,8 +156,12 @@ PROPOSE_SCHEMA = {
                 "rationale": {"type": "string"},
                 "key": {"type": "string"},
                 "value": {"type": "number"},
+                "assumptions": ASSUMPTIONS,
+                "unknowns": UNKNOWNS,
+                "predictions": PREDICTIONS,
             },
-            "required": ["title", "rationale", "key", "value"],
+            "required": ["title", "rationale", "key", "value", "assumptions", "unknowns",
+                         "predictions"],
             "additionalProperties": False}},
     },
     "required": ["assessment", "proposals", "regulation_proposals"],
@@ -235,17 +239,36 @@ DECIDE_SCHEMA = {
         "predictions": PREDICTIONS,
         "follow_ups": {"type": "array", "items": {
             "type": "object",
-            "properties": {"text": {"type": "string"}, "due_period": {"type": "integer"}},
-            "required": ["text", "due_period"], "additionalProperties": False}},
+            "properties": {
+                "text": {"type": "string"},
+                "due_period": {"type": "integer"},
+                "kind": {"type": "string", "enum": ["remeasure", "action"],
+                         "description": "remeasure: measure the rules in force again under the "
+                                        "conditions of this period (the same seeds and demand); "
+                                        "the steward does it in the next period. action: "
+                                        "anything else; a later decision fulfils it."},
+                "metrics": {"type": "array", "items": {"type": "string"},
+                            "description": "For remeasure: the values to measure again, as "
+                                           "'metric:<name>' (a metric of the measured table) or "
+                                           "'metric:utility@<company>' (A, B, C). Empty for "
+                                           "action."},
+            },
+            "required": ["text", "due_period", "kind", "metrics"], "additionalProperties": False}},
+        "fulfils": {"type": "array", "items": {"type": "string"},
+                    "description": "The ids of open follow-ups (listed in the request) that "
+                                   "this decision fulfils. Only an action can be fulfilled by "
+                                   "a decision; empty if none."},
     },
-    "required": ["choice", "reason", "assumptions", "unknowns", "predictions", "follow_ups"],
+    "required": ["choice", "reason", "assumptions", "unknowns", "predictions", "follow_ups",
+                 "fulfils"],
     "additionalProperties": False,
 }
 
 DECIDE_SYSTEM = ROLES + """
-いまの依頼は、人間（サービスの運営者）に代わって、判断要求に答えることです。運営者は
-あなたに判断を任せましたが、判断の責任の所在は記録に残ります。あなたの判断は、人間の
-判断と同じ形で記録され、同じ規則で検査されます。
+いまの依頼は、人間に代わって、判断要求に答えることです。代わりに判断する相手は、
+依頼の中に書かれています（規則と契約についてはサービスの運営者、規制については規制の
+担当者）。その人間はあなたに判断を任せましたが、判断の責任の所在は記録に残ります。
+あなたの判断は、人間の判断と同じ形で記録され、同じ規則で検査されます。
 
 - choice：選ぶ選択肢の id（渡された選択肢のどれか）。
 - reason：選んだ理由。測った結果の表の数値を引くときは、表のとおりに書きます。
@@ -254,6 +277,11 @@ DECIDE_SYSTEM = ROLES + """
 - unknowns：判断に関わるのに、知らないこと、測っていないこと。
 - predictions：選んだ選択肢で、次に何が起こると予測するか。
 - follow_ups：後で確かめることと、その期（due_period）。なければ空にします。
+  kind は、この期と同じ条件（同じ乱数シードと需要）で、いまの規則を測り直すことなら
+  remeasure、それ以外なら action です。remeasure は次の期に steward が測り直し、
+  metrics に挙げた値がそろえば果たされます。action は、後の判断が果たします。
+- fulfils：依頼に挙げた、まだ果たされていない約束のうち、この判断が果たす action の id。
+  なければ空にします。
 顧客は投票に加わりません。契約（顧客への約束）を変えるときは、顧客への影響を理由に書きます。
 文章はすべて日本語で書いてください。比喩は使わず、そのままの言葉で書いてください（「関門」ではなく「判定」、「測り方」ではなく「評価方法」、「見張る」ではなく「監視する」、「狙い」ではなく「意図」、「見立て」ではなく「所見」、「損得」ではなく「利害」）。"""
 
@@ -311,10 +339,14 @@ def request_request(kpi_text: str, spec_text: str, reasons: str, table: str, opt
     return _request(_lang(REQUEST_SYSTEM, lang), user, REQUEST_SCHEMA, effort="medium")
 
 
-def decide_request(request_text: str, options: str, decisions: str, lang: str = "ja") -> dict:
-    """人間に代わって判断要求に答える（--decider llm）。KPI の読み方の選択にも使う。"""
-    user = (f"## 判断要求\n{request_text}\n\n## 選べる選択肢（id: 内容）\n{options}\n\n"
-            f"## これまでの判断（理由を含む）\n{decisions or '（なし）'}\n")
+def decide_request(request_text: str, options: str, decisions: str, lang: str = "ja",
+                   principal: str = "", open_follow_ups: str = "") -> dict:
+    """人間に代わって判断要求に答える（--decider llm）。KPI の読み方の選択にも使う。
+    principal：代わりに判断する相手。open_follow_ups：まだ果たされていない約束（id: 内容）。"""
+    user = ((f"## 代わりに判断する相手\n{principal}\n\n" if principal else "")
+            + f"## 判断要求\n{request_text}\n\n## 選べる選択肢（id: 内容）\n{options}\n\n"
+            f"## これまでの判断（理由を含む）\n{decisions or '（なし）'}\n\n"
+            f"## まだ果たされていない約束\n{open_follow_ups or '（なし）'}\n")
     return _request(_lang(DECIDE_SYSTEM, lang), user, DECIDE_SCHEMA, effort="medium")
 
 

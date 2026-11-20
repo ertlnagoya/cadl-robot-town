@@ -1,0 +1,9 @@
+{
+  "note": "claude-opus-5-5、入力 15164 / 出力 814 トークン",
+  "request_digest": "0c6c26e146dcd60d",
+  "data": {
+    "assessment": "閑散期の現行規則（sanction_lambda 1.0）で、注文 87.4 件のうち 87.2 件が定時に届き、未配達は 0.0、最低の会社の定時率は 0.99、worst_company_p95_wait_s は 81.2 秒です。改善の余地は最大でも約 0.2 件で、憲法の min_improvement 1.0 を満たす規則案は測る前から成り立たないと判断します。違反 22.0 件のうち 21.4 件は道路上の停止時間の超過（deadline:release、Minor）で、罰点 22.6 はほぼ C 社に集中しており、C 社の効用は 8.4 と A 社 27.4・B 社 28.8 より大きく低いです。これは顧客への影響ではなく会社間の利害の差として記録し、需要が増える期に hold_limit の調整を検討する材料とします。",
+    "proposals": [],
+    "regulation_proposals": []
+  }
+}

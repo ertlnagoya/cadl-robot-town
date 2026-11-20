@@ -1,0 +1,66 @@
+{
+  "note": "claude-opus-5-5、入力 5177 / 出力 2405 トークン",
+  "request_digest": "5c3536133b9b5047",
+  "data": {
+    "question": "Should the regulation officer lower the constitution's vote.quorum from 2 to 1 (R1), so that block_k 3 → 2 (proposal 1), which A alone supports, can be adopted, or keep the regulation at constitution-v1?",
+    "background": "R1 changes a value of the constitution, and only a human can change the regulation layer. The service operator has said three times (D1, D2, D3) that this decision belongs to the regulation officer. R1 also affects every future vote for all three companies, and through them every customer, not only proposal 1. Weighing a one-time customer gain against a lasting change in governance, and against C's further loss, is a value judgment for humans; it is not something I can settle by measurement.",
+    "options": [
+      {
+        "id": "R1",
+        "summary": "With quorum 1, proposal 1 (block_k 3 → 2) passes on A's vote alone (votes ○ × ×). Measured against current, on-time rises 213.6 → 219.4 (+5.8), but the improvement held on only 3/5 seeds. Late falls 9.2 → 3.4, the lowest on-time rate rises 0.93 → 0.96, unfinished stays 0.0 and blocked s falls 1888 → 1217. Road violations rise 24.2 → 34.8. sanction_total has not been measured. From now on, any rule that passes check, the constitution and the improvement test could be adopted with the support of a single company.",
+        "stakeholders": "Customers gain on this measurement: about 5.8 more on-time deliveries, about 5.8 fewer late deliveries, and a better result for the worst-served company's customers. The gain is less certain than before (3/5 seeds), and customers bear the extra road violations. A gains (utility 70.2 → 75.6). B loses (69.6 → 62.5). C loses the most (58.3 → 46.9), and C is already the lowest. B and C also lose their collective veto on all future rules. That veto is a governance risk for every company, and indirectly for customers, if a single company later pushes through rules that serve itself."
+      },
+      {
+        "id": "keep",
+        "summary": "The regulation stays at constitution-v1 (quorum 2), and proposal 1 stays rejected by vote. The current figures stay as they are: on-time 213.6, late 9.2, lowest on-time rate 0.93, unfinished 0.0, road violations 24.2. Rules that pass by vote can still be adopted, such as proposal 2 (hold_limit 60s → 50s, A ○ B ○), which gives on-time 215.8 and late 7.0. Proposal 1 or a compensated variant can be brought back later with sanction_total measured.",
+        "stakeholders": "Customers forgo the extra gain of proposal 1 for now: about 3.6 on-time deliveries and about 3.6 late deliveries compared with proposal 2. They keep a governance in which rules need broad support. B and C keep their veto and avoid utility losses. C in particular avoids a fall to 46.9. A forgoes its utility gain under proposal 1 (75.6 vs 73.0 under proposal 2)."
+      }
+    ],
+    "recommendation": {
+      "id": "keep",
+      "reason": "The condition the operator set for any referral in K1 is still not met: sanction_total has not been reported for proposal 1. The case for proposal 1 has also weakened. Its improvement held on only 3/5 seeds, against 5/5 earlier, and its gain over the vote-passing proposal 2 is small (219.4 vs 215.8 on-time). Its costs are concentrated on C, the company already at the lowest utility, and road violations rise to 34.8. Quorum 1 is a permanent change for all future rules, made to secure one uncertain gain. That trade is not justified on the current evidence. A votable path that improves every KPI measure (proposal 2) already exists.",
+      "assumptions": [
+        "Proposal 2 remains adoptable by vote and is not affected by keeping quorum 2.",
+        "The measured figures in the table hold for the coming period's demand.",
+        "B and C would keep voting against block_k 3 → 2 unless it is compensated or changed.",
+        "Under quorum 1, the other gates (check, constitution invariants, same-seed improvement) would still apply to future rules."
+      ],
+      "predictions": [
+        {
+          "subject": "metric:on_time_deliveries",
+          "expected": "unchanged",
+          "note": "No regulation change; proposal 1 stays rejected (current 213.6)."
+        },
+        {
+          "subject": "metric:late_deliveries",
+          "expected": "unchanged",
+          "note": "Stays at 9.2 without further rule changes."
+        },
+        {
+          "subject": "metric:min_company_on_time_rate",
+          "expected": "unchanged",
+          "note": "Stays at 0.93."
+        },
+        {
+          "subject": "metric:unfinished",
+          "expected": "unchanged",
+          "note": "Stays at 0.0."
+        },
+        {
+          "subject": "metric:road_violations",
+          "expected": "unchanged",
+          "note": "Avoids the rise to 34.8 under proposal 1."
+        }
+      ]
+    },
+    "unknowns": [
+      "sanction_total under proposal 1 (and under proposal 2), which the operator required in K1 before any referral.",
+      "Why B and C vote against block_k 3 → 2, and whether a partial compensation would make it votable.",
+      "Whether the 3/5 seeds result means the gain from proposal 1 is shrinking or is just noise; only 5 seeds were measured.",
+      "How each company would use quorum 1 on future rules (their policies and intentions).",
+      "How customers perceive the extra road violations and the change in late deliveries.",
+      "Next period's demand and whether the measured gains carry over.",
+      "The combined effect of proposal 1 on top of proposal 2, which has not been measured."
+    ]
+  }
+}

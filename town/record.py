@@ -74,8 +74,8 @@ class Gsn:
 
 def attach_answer(gsn: Gsn, parent: str, answer: dict) -> None:
     """判断した者の回答（自然言語の reason と、GSN の要素 gsn:）を parent の下につなぐ。
-    人間に代わって LLM が答えたとき（by: llm-decider）は、要素の by を llm にする。"""
-    by = "llm" if answer.get("by") == "llm-decider" else "human"
+    人間に代わって LLM が答えたとき（by: llm-decider、llm-regulator）は、要素の by を llm にする。"""
+    by = "llm" if str(answer.get("by", "")).startswith("llm") else "human"
     if answer.get("reason"):
         gsn.add("justification", answer["reason"], parent, by=by)
     for a in answer.get("assumptions") or []:

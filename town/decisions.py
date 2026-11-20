@@ -1,20 +1,22 @@
-"""判断の記録（decisions.jsonl）：仕様の付録 L（decisions 0.1）の形式で書き出す。
+"""判断の記録（decisions.jsonl）：仕様の付録 L（decisions 0.2）の形式で書き出す。
 
 steward と council の実行ごとに、runs/<名前>/decisions.jsonl を書く。人が読む
 decisions.md、gsn.yaml と同じ実行を、機械で読める形で残す。
 
-- 当事者：KPI を書き判断する人間（operator）、提案し推奨する LLM（llm）、判断要求に
-  人間に代わって答える LLM（llm-decider、--decider llm のとき）、測って判定し、
-  判定をすべて通った案を自動で採択するツール（steward または council）、投票する
-  3 社（A、B、C）、投票に加わらない顧客（customers）。
+- 当事者：KPI を書き、規則と契約について判断する人間（operator）、規制（憲法）について
+  判断する人間（regulator、steward のみ）、提案し推奨する LLM（llm）、判断要求に人間に
+  代わって答える LLM（--decider llm のとき。運営者に代わる llm-decider、規制の担当者に
+  代わる llm-regulator）、測って判定し、判定をすべて通った規則の案を自動で採択する
+  ツール（steward または council）、投票する 3 社（A、B、C）、投票に加わらない顧客
+  （customers）。判断する当事者は、判断してよい層（layers）を持つ。
 - 項目：目的（KPI）、改正案、測定、判定、投票、判断要求、推奨、判断、バージョン、
-  後で確かめる約束。人間でも LLM でもツールでも、提案・推奨・判断には同じ証拠の
+  後で確かめる約束（何が果たすか、fulfilled_by を持つ）。人間でも LLM でもツールでも、提案・推奨・判断には同じ証拠の
   フィールド（理由、前提、分からないこと、予測）を持たせる。
 - 完全性：各行に、付録 G の G.8 のハッシュの連鎖（seq、prev、digest）を付ける。
 
     cadl decisions-verify runs/<名前>/decisions.jsonl     # 検査と、確認のための指摘
 
-書き出しには cadl 0.3.37 以降の cadl.decisions を使う。
+書き出しには cadl 0.3.38 以降の cadl.decisions を使う（decisions 0.2）。
 """
 from __future__ import annotations
 
@@ -38,24 +40,42 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def party(pid, kind, roles, name=None, actor=None, model=None, on_behalf_of=None) -> dict:
+OPERATOR_LAYERS = ["rule", "contract"]
+REGULATOR_LAYERS = ["regulation"]
+
+
+def party(pid, kind, roles, name=None, actor=None, model=None, on_behalf_of=None,
+          layers=None) -> dict:
     return {"id": pid, "kind": kind, "roles": roles, "name": name, "actor": actor,
-            "model": model, "on_behalf_of": on_behalf_of}
+            "model": model, "on_behalf_of": on_behalf_of, "layers": layers}
 
 
 def parties(tool: str, tool_version: str, llm_model: str | None, proposer: str,
-            decider: str = "human") -> list[dict]:
-    """proposer: llm か tool（council の neighbors）。decider: human か llm。"""
+            decider: str = "human", delegate=(), regulator: bool = False) -> list[dict]:
+    """proposer: llm か tool（council の neighbors）。decider: human か llm。
+    delegate: --decider llm のとき、LLM が人間に代わって判断する層。
+    regulator: 規制（憲法）について判断する人間を置くか（steward）。"""
     tool_roles = ["assessor", "decider"] + (["proposer"] if proposer == "tool" else [])
-    out = [party("operator", "human", ["owner"] + (["decider"] if decider == "human" else []),
-                 "service operator", "OPERATOR")]
+    delegate = set(delegate) if decider == "llm" else set()
+    for_operator = [x for x in OPERATOR_LAYERS if x in delegate]
+    # 判断を任せた人間も、判断する者（decider）のまま残る。任せた層のほかは自分で判断し、
+    # 任せた層の判断も、その人間に代わって行われたものとして記録に残る
+    out = [party("operator", "human", ["owner", "decider"], "service operator", "OPERATOR",
+                 layers=OPERATOR_LAYERS)]
+    if regulator:
+        out.append(party("regulator", "human", ["decider"], "regulator", "REGULATOR",
+                         layers=REGULATOR_LAYERS))
     if llm_model:
         out.append(party("llm", "llm", ["proposer", "advisor"] if proposer == "llm" else ["advisor"],
                          None, None, llm_model))
-    if decider == "llm":
+    if for_operator:
         out.append(party("llm-decider", "llm", ["decider"], "LLM deciding for the operator",
-                         None, llm_model, on_behalf_of="operator"))
-    out.append(party(tool, "tool", tool_roles, f"town.{tool}", None, tool_version))
+                         None, llm_model, on_behalf_of="operator", layers=for_operator))
+    if regulator and "regulation" in delegate:
+        out.append(party("llm-regulator", "llm", ["decider"], "LLM deciding for the regulator",
+                         None, llm_model, on_behalf_of="regulator", layers=REGULATOR_LAYERS))
+    out.append(party(tool, "tool", tool_roles, f"town.{tool}", None, tool_version,
+                     layers=["rule"]))
     out += [party(c, "agent", ["voter"], f"company {c}") for c in ("A", "B", "C")]
     out.append(party("customers", "organisation", ["affected"], "customers"))
     return out
@@ -94,16 +114,39 @@ def predictions(items, option: str, voters=("A", "B", "C")) -> list[dict]:
     return out
 
 
+def subject_value(m: dict | None, subject: str):
+    """測定の項目から、metric:<名前> または metric:<名前>@<当事者> の値（なければ None）。"""
+    if not m or not subject.startswith("metric:"):
+        return None
+    name, _, who = subject[7:].partition("@")
+    src = (m.get("per_party") or {}).get(who) if who else m.get("values")
+    v = (src or {}).get(name)
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def conditions(sim: dict) -> str:
+    """測った条件（同じ条件で測り直したかを、付録 L の method で比べられるように）。"""
+    text = (f"seeds {', '.join(map(str, sim['seeds']))}; mean order interval "
+            f"{sim['order_interval_s']} s")
+    r = sim.get("rush")
+    if r:
+        text += (f"; rush {r['from_s']:g}-{r['to_s']:g} s, mean order interval "
+                 f"{r['order_interval_s']:g} s")
+    return text
+
+
 class Record:
     """判断の記録の項目を集め、期の終わりごとに decisions.jsonl を書き直す。"""
 
     def __init__(self, run_dir: Path, model_name: str, first: Path, parties_: list[dict],
                  time_base: str, key: bytes | None = None):
         try:
-            from cadl.decisions import DecisionChain    # cadl 0.3.37 以降
+            from cadl.decisions import FORMAT, DecisionChain    # cadl 0.3.38 以降（decisions 0.2）
+            if FORMAT != "cadl-decisions/2":
+                raise ImportError(FORMAT)
         except ImportError:                             # 古い cadl：記録は書かずに続ける
             DecisionChain = None
-            print("  [注意] cadl 0.3.37 以降がないので、判断の記録（decisions.jsonl）は書き出しません。")
+            print("  [注意] cadl 0.3.38 以降がないので、判断の記録（decisions.jsonl）は書き出しません。")
         self.chain_cls = DecisionChain
         self.run_dir, self.parties, self.time_base, self.key = run_dir, parties_, time_base, key
         self.model = {"name": model_name, "version": "v1", "source_sha256": sha256(first)}
@@ -118,6 +161,9 @@ class Record:
                              "fulfils": list(fulfils), "attachments": list(attachments),
                              "generated": generated, **fields})
         return eid
+
+    def get(self, eid: str | None) -> dict | None:
+        return next((e for e in self.entries if e["id"] == eid), None)
 
     def ids(self, *types: str, period: int | None = None) -> list[str]:
         return [e["id"] for e in self.entries if e["type"] in types
@@ -147,10 +193,20 @@ class Record:
                             if k in vals}
         return self.add(eid, "measurement", by, period, fulfils=fulfils, of=of, version=version,
                         method={"runs": len(sim["seeds"]), "window": f"{sim['period_s']}s",
-                                "description": f"seeds {', '.join(map(str, sim['seeds']))}; mean "
-                                               f"order interval {sim['order_interval_s']} s"},
+                                "description": conditions(sim)},
                         values={k: round(float(v), 4) for k, v in vals.items()},
                         per_party=per, compared_with=compared_with, runs_better=runs_better)
+
+    def follow_up(self, eid: str, by: str, period: int, text: str, due: int | None,
+                  decision: str, remeasure_of: str | None = None, subjects=()) -> str:
+        """後で確かめる約束。remeasure_of があれば、その測定と同じ条件での測り直しだけが果たす。
+        なければ、後の判断がそれを果たしたと書く（fulfils）。"""
+        fulfilled_by = ({"type": "measurement", "of": "in_force", "same_method_as": remeasure_of,
+                         "subjects": list(subjects)} if remeasure_of else
+                        {"type": "decision", "of": None, "same_method_as": None, "subjects": []})
+        return self.add(eid, "follow_up", by, period, text=text,
+                        due={"period": due} if isinstance(due, int) and due >= 1 else None,
+                        decision=decision, fulfilled_by=fulfilled_by)
 
     def checks(self, eid: str, by: str, period: int, proposal: str, gates: dict, notes: str) -> str:
         results = [{"name": GATE_NAMES.get(g, g), "passed": v, "note": None}

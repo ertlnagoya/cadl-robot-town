@@ -45,7 +45,7 @@ There are two amendment loops.
 Assumes Course A's setup: the CADL compiler cloned to `~/program/cadl_repo`, as in
 [Section 2.4 of the Textbook](https://www.ertl.jp/cadl-spec/docs/textbook/toolchain-setup/#24-setup-5-min),
 which also lists fixes for install problems. Use cadl 0.3.32 or later (checked
-with 0.3.37; see `cadl --version`; the decision records need 0.3.37): an older compiler leaves the safety invariant of a
+with 0.3.38; see `cadl --version`; the decision records need 0.3.38): an older compiler leaves the safety invariant of a
 regime transition out of the IR, and the town refuses the rules. A rule file with
 `sos.regimes` (per-regime bindings, cadl 0.3.32) is refused too, since the town does
 not apply those bindings yet.
@@ -248,28 +248,47 @@ current request.
 
 `town.steward` and `town.council` write `runs/<name>/decisions.jsonl` in each run, in the
 format of [Appendix L](https://www.ertl.jp/cadl-spec/docs/spec/appendix-l-decisions) of the
-CADL specification: who proposed what, what was measured, how each company voted, who
-recommended what, and who decided with which reason, one entry per line, with the hash
-chain of G.8.
+CADL specification (decisions 0.2): who proposed what, what was measured, how each company
+voted, who recommended what, and who decided with which reason, one entry per line, with the
+hash chain of G.8.
 
 ```bash
-cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.37 or later
+cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.38 or later
 ```
 
 - A proposal, a recommendation and a decision carry the same evidence (reason, assumptions,
   unknowns, predictions) whether a person, the LLM or a tool made them. `town.steward` stops
   when a human answer in `answers.yaml` has no reason. An answer may also give `unknowns`,
-  `follow_ups` (`text` and the period `due`) and `fulfils` (ids of earlier follow-ups, such
-  as `D1.f1`).
-- With `--decider llm`, the LLM answers the decision requests in place of the human
-  (`llm/p<k>-decide.json`). In the record it is a party acting on behalf of the operator
-  (`on_behalf_of: operator`), and the verifier reports the finding delegated, for the rules
-  and the contract alike.
+  `follow_ups` and `fulfils` (ids of earlier follow-ups, such as `D1.f1`).
+- Who decides what: the operator decides on the rules and the contract (and on the reading of
+  the KPI), the regulator, another person, on the regulation (the values of the constitution
+  under `regulation:`). A regulation proposal goes to the regulator in a request of its own
+  (`R<k>`, `p<k>-reg-request.md`, answered under `R<k>` in `answers.yaml`), after the decision
+  on the rules and the contract of the same period; a change takes effect in the next period
+  (`constitution-v<n>.yaml`). In the record each decider gives its `layers`, and the steward,
+  which adopts by itself only rule changes, has `["rule"]`.
+- A follow-up says what fulfils it. In an answer, `follow_ups` items have `text`, `due` (a
+  period) and, for a promise to measure again, `remeasure: true` with `metrics` (such as
+  `utility@C`, `road_violations`). The steward makes that measurement at the start of the next
+  period under the conditions of the period of the decision (the same seeds and demand), as
+  `F<k>.<follow-up id>`, which fulfils the promise. Any other follow-up is fulfilled by a later
+  decision that names it in `fulfils`; a decision that names a promise to re-measure does not
+  fulfil it, and the verifier reports `fulfilment not shown`.
+- With `--decider llm`, the LLM answers the decision requests in place of the human for the
+  layers given with `--delegate` (default `rule,contract`; `rule` and `contract` go together,
+  since they are decided in one request). It acts for the operator as `llm-decider`
+  (`llm/p<k>-decide.json`, `llm/p<k>-kpi-decide.json`) and for the regulator as
+  `llm-regulator` (`llm/p<k>-reg-decide.json`); requests on the other layers go to the human.
+  The LLM sees the open follow-ups, says which of them a decision fulfils (`fulfils`), and
+  marks its own follow-ups as `remeasure` or `action`. The verifier reports the finding
+  delegated for each of its decisions.
 - `--layers rule,contract` keeps the proposals to the rule and contract layers (regulation
   proposals are left out unmeasured).
-- Samples: `examples/steward-contract/` (Japanese) and `examples/steward-contract-en/`
-  (English) are six periods under a KPI that allows the promised times to be revised, decided
-  by the LLM in place of the human.
+- Samples, decided by the LLM in place of the humans (Claude Opus 5.5, 2026-11-21):
+  `examples/steward-contract/` (Japanese) and `examples/steward-contract-en/` (English), six
+  periods under a KPI that allows the promised times to be revised (`--layers rule,contract`);
+  `examples/steward-regulation/` and `examples/steward-regulation-en/`, six periods under a KPI
+  that allows the regulation to be revised (`--delegate rule,contract,regulation`).
 
 ## License
 
