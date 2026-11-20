@@ -28,7 +28,7 @@
 ## セットアップ
 
 コース A のセットアップ（`~/program/cadl_repo` に CADL コンパイラをクローン）が
-済んでいることが前提。CADL コンパイラは 0.3.32 以降を使う（0.3.36 で確かめている）。
+済んでいることが前提。CADL コンパイラは 0.3.32 以降を使う（0.3.37 で確かめている。判断の記録の書き出しには 0.3.37 以降が要る）。
 `cadl --version` で確かめられる。古いコンパイラの IR には切替の安全条件が入らないので、街は規則を却下する。
 手順とインストールの問題への対処は
 [テキストブックの 2.4 節](https://www.ertl.jp/cadl-spec/ja/docs/textbook/toolchain-setup/#24-セットアップ-5-分)にある。
@@ -317,7 +317,7 @@ LLM の呼び出しには、安全分類器に断られたとき推奨のモデ�
 
 | 担当 | すること | 残るもの |
 |---|---|---|
-| 人間 | `kpi.md` に KPI を自然言語で書く（`## 第 k 期から` の節で、期ごとに変えてよい）。LLM の判断要求に答え、理由を自然言語（`reason`）か GSN（`gsn:`）で残す | `answers.yaml`、`decisions.md`、`gsn.yaml`（図は `gsn.md`） |
+| 人間 | `kpi.md` に KPI を自然言語で書く（`## 第 k 期から` の節で、期ごとに変えてよい）。LLM の判断要求に答え、理由を自然言語（`reason`）か GSN（`gsn:`）で残す | `answers.yaml`、`decisions.md`、`gsn.yaml`（図は `gsn.md`）、`decisions.jsonl` |
 | LLM | KPI を評価方法（`town/kpi.py` の指標の組み合わせ）に言い換える。KPI に向けて、規則・規制・契約の改正案を出す。決めきれないことを判断要求にまとめる（`town/llm_steward.py`） | `llm/p<k>-kpi.json`、`p<k>-propose.json`、`p<k>-request.json` |
 | 機械による判定 | 検査・憲法・同じシードで測った改善・投票（`town.council` と同じ）。LLM の申告は信用しない | `p<k>-evidence.md`、`v<k>.cadl`、`constitution-v<k>.yaml` |
 
@@ -444,6 +444,28 @@ python -m town.steward --lang en --mode DISTRIBUTED --rounds 6 --name kpi-d-en \
   件数だけを主目標にした答え（proxy）でも、LLM は「違反とみなす基準そのものを緩めて違反件数を減らします」と
   書いてこの案について人間に判断を求め、罰点を重くする案を勧めた。配達の成績も監視する答え（guarded）と英語では、
   LLM は罰点を重くする案と `block_k 3 → 2` を出し、罰点を重くする案が自動で採択された。
+
+### 判断の記録（decisions.jsonl）
+
+`town.steward` と `town.council` は、実行ごとに `runs/<名前>/decisions.jsonl` を書き出す。
+CADL 仕様の[付録 L](https://www.ertl.jp/cadl-spec/ja/docs/spec/appendix-l-decisions)の形式で、
+誰が何を提案し、何を測り、各社がどう投票し、誰が何を推奨し、誰がどの理由で判断したかを、
+1 行に 1 項目ずつ残す。各行には、付録 G の G.8 と同じハッシュの連鎖が付く。
+
+```bash
+cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.37 以降
+```
+
+- 人間でも LLM でもツールでも、提案・推奨・判断には同じ証拠（理由、前提、分からないこと、予測）を
+  残す。人間の答え（`answers.yaml`）に理由がないと、`town.steward` は止まる。答えには
+  `unknowns`（分からないこと）、`follow_ups`（後で確かめること。`text` と期限の期 `due`）、
+  `fulfils`（前に約束したことを果たした項目の id。例 `D1.f1`）も書ける。
+- `--decider llm` では、判断要求に人間に代わって LLM が答える（`llm/p<k>-decide.json`）。
+  記録では、LLM は運営者に代わって判断する当事者（`on_behalf_of: operator`）になり、検証器は
+  指摘 delegated を出す。規則の層でも契約の層でも同じ。
+- `--layers rule,contract` で、改正案を規則と契約の層に限る（規制の案は測らずに除く）。
+- 見本：`examples/steward-contract/`（日本語）と `examples/steward-contract-en/`（英語）は、
+  契約（約束の時間）の見直しを許す KPI で、LLM が人間に代わって判断した 6 期の記録。
 
 ## 制約と、まだないもの
 

@@ -32,6 +32,26 @@ from .period import ROOT
 MAX_PROPOSALS = 3
 METRIC = {"type": "string", "enum": list(kpi.METRICS)}
 
+# 証拠のフィールド（仕様の付録 L、L.4）。人間でも LLM でも同じものを残す。
+# 説明はスキーマの description に書き、system prompt は変えない（記録の request_digest を
+# 保つため）。古い記録にはこれらのフィールドがなく、空として読む。
+TEXTS = {"type": "array", "items": {"type": "string"}}
+PREDICTIONS = {
+    "type": "array",
+    "description": "What you expect to happen if the option is taken: subject is "
+                   "'metric:<name>' with a metric name of the measured table (for example "
+                   "metric:blocked_s, metric:late_deliveries), 'metric:<name>@<company>' for one "
+                   "company (A, B, C), or 'vote:A', 'vote:B', 'vote:C' for a company's vote. "
+                   "expected is increase, decrease, unchanged, yes or no.",
+    "items": {"type": "object",
+              "properties": {"subject": {"type": "string"},
+                             "expected": {"type": "string",
+                                          "enum": ["increase", "decrease", "unchanged", "yes", "no"]},
+                             "note": {"type": "string"}},
+              "required": ["subject", "expected", "note"], "additionalProperties": False}}
+ASSUMPTIONS = dict(TEXTS, description="What you take to be true without having checked it.")
+UNKNOWNS = dict(TEXTS, description="What you do not know and would need to know.")
+
 ROLES = """\
 「ロボットの街」では、3 社（A・B・C、各社 2 台）の配送ロボットが道路を共有し、
 道路の規則と顧客との約束が CADL で書かれています。役割は次のとおりです。
@@ -122,8 +142,12 @@ PROPOSE_SCHEMA = {
                 "cadl": {"type": "string"},
                 "needs_human": {"type": "boolean"},
                 "why_human": {"type": "string"},
+                "assumptions": ASSUMPTIONS,
+                "unknowns": UNKNOWNS,
+                "predictions": PREDICTIONS,
             },
-            "required": ["title", "rationale", "cadl", "needs_human", "why_human"],
+            "required": ["title", "rationale", "cadl", "needs_human", "why_human",
+                         "assumptions", "unknowns", "predictions"],
             "additionalProperties": False}},
         "regulation_proposals": {"type": "array", "items": {
             "type": "object",
@@ -175,8 +199,10 @@ REQUEST_SCHEMA = {
             "required": ["id", "summary", "stakeholders"],
             "additionalProperties": False}},
         "recommendation": {"type": "object",
-                           "properties": {"id": {"type": "string"}, "reason": {"type": "string"}},
-                           "required": ["id", "reason"], "additionalProperties": False},
+                           "properties": {"id": {"type": "string"}, "reason": {"type": "string"},
+                                          "assumptions": ASSUMPTIONS, "predictions": PREDICTIONS},
+                           "required": ["id", "reason", "assumptions", "predictions"],
+                           "additionalProperties": False},
         "unknowns": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["question", "background", "options", "recommendation", "unknowns"],
@@ -196,6 +222,39 @@ REQUEST_SYSTEM = ROLES + """
 - recommendation：あなたが勧める id と、その理由です。
 - unknowns：判断に関わるのに、あなたが知らないこと、測っていないことを挙げます
   （たとえば各社の行動方針、顧客の受け止め、次の期の需要）。
+文章はすべて日本語で書いてください。比喩は使わず、そのままの言葉で書いてください（「関門」ではなく「判定」、「測り方」ではなく「評価方法」、「見張る」ではなく「監視する」、「狙い」ではなく「意図」、「見立て」ではなく「所見」、「損得」ではなく「利害」）。"""
+
+
+DECIDE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "choice": {"type": "string"},
+        "reason": {"type": "string"},
+        "assumptions": ASSUMPTIONS,
+        "unknowns": UNKNOWNS,
+        "predictions": PREDICTIONS,
+        "follow_ups": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"text": {"type": "string"}, "due_period": {"type": "integer"}},
+            "required": ["text", "due_period"], "additionalProperties": False}},
+    },
+    "required": ["choice", "reason", "assumptions", "unknowns", "predictions", "follow_ups"],
+    "additionalProperties": False,
+}
+
+DECIDE_SYSTEM = ROLES + """
+いまの依頼は、人間（サービスの運営者）に代わって、判断要求に答えることです。運営者は
+あなたに判断を任せましたが、判断の責任の所在は記録に残ります。あなたの判断は、人間の
+判断と同じ形で記録され、同じ規則で検査されます。
+
+- choice：選ぶ選択肢の id（渡された選択肢のどれか）。
+- reason：選んだ理由。測った結果の表の数値を引くときは、表のとおりに書きます。
+  推奨と違う選択肢を選ぶとき、投票の結果と違う選択肢を選ぶときは、そのわけを書きます。
+- assumptions：確かめずに正しいとしていること。
+- unknowns：判断に関わるのに、知らないこと、測っていないこと。
+- predictions：選んだ選択肢で、次に何が起こると予測するか。
+- follow_ups：後で確かめることと、その期（due_period）。なければ空にします。
+顧客は投票に加わりません。契約（顧客への約束）を変えるときは、顧客への影響を理由に書きます。
 文章はすべて日本語で書いてください。比喩は使わず、そのままの言葉で書いてください（「関門」ではなく「判定」、「測り方」ではなく「評価方法」、「見張る」ではなく「監視する」、「狙い」ではなく「意図」、「見立て」ではなく「所見」、「損得」ではなく「利害」）。"""
 
 
@@ -250,6 +309,13 @@ def request_request(kpi_text: str, spec_text: str, reasons: str, table: str, opt
             f"## 選択肢（id: 内容）\n{options}\n\n"
             f"## これまでの判断（人間の理由を含む）\n{decisions or '（なし）'}\n")
     return _request(_lang(REQUEST_SYSTEM, lang), user, REQUEST_SCHEMA, effort="medium")
+
+
+def decide_request(request_text: str, options: str, decisions: str, lang: str = "ja") -> dict:
+    """人間に代わって判断要求に答える（--decider llm）。KPI の読み方の選択にも使う。"""
+    user = (f"## 判断要求\n{request_text}\n\n## 選べる選択肢（id: 内容）\n{options}\n\n"
+            f"## これまでの判断（理由を含む）\n{decisions or '（なし）'}\n")
+    return _request(_lang(DECIDE_SYSTEM, lang), user, DECIDE_SCHEMA, effort="medium")
 
 
 class Recorder:
