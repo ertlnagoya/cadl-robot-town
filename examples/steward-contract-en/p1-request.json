@@ -1,0 +1,96 @@
+{
+  "note": "claude-opus-5-5、入力 3254 / 出力 2876 トークン",
+  "request_digest": "8b738a504e5a7d38",
+  "data": {
+    "question": "Should we adopt the rule change block_k 3 → 2, which B and C voted against; adopt the contract change that relaxes the pickup promise from 120 s to 150 s; or keep the current rules and contract?",
+    "background": "Option 1 passed check, constitution and the KPI conditions, and improved on_time_deliveries by +9.2 on 5/5 seeds. However, B and C voted it down, and overriding or renegotiating a company vote is a decision for the human operators, not for me. Option 3 changes the customer promise (DELIVERY_SLA). Customers do not vote, and the KPI requires a human to accept a looser promise only after seeing its measured same-seed effect on customer waits, so I cannot adopt it myself either.",
+    "options": [
+      {
+        "id": "1",
+        "summary": "Evict a parked robot when 2 (not 3) robots are waiting behind it. On-time rises from 121.8 to 131.0 (+9.2, 5/5 seeds) and late falls from 10.4 to 1.2. Blocked s falls from 2404 to 985, and the lowest on-time rate rises from 0.84 to 0.98. Customer waits improve: p95_wait_s goes from 188 to 81.4 and max_wait_s from 385 to 245, while unfinished stays at 0.0. Road violations rise from 25.8 to 34.0. Votes were A ○, B ×, C ×.",
+        "stakeholders": "Customers gain the most: more orders arrive on time and actual waits are much shorter, with no change to their promise. A gains (utility 38.4 → 45.4). B loses slightly (38.9 → 37.2). C loses heavily (28.8 → 19.0), presumably because its robots are evicted more often. Other road users may bear the cost of more road violations (25.8 → 34.0)."
+      },
+      {
+        "id": "3",
+        "summary": "Relax the pickup promise from 120 s to 150 s. On-time rises from 121.8 to 122.6 (+0.8, only 3/5 seeds) and late falls from 10.4 to 9.6. Blocked s (2404) and road violations (25.8) are unchanged. p95_wait_s 188, max_wait_s 385 and unfinished 0.0 are all unchanged. All three companies voted ○.",
+        "stakeholders": "Customers do not wait any less. They receive a weaker promise, and the small on-time gain comes from redefining what counts as on time, not from faster service. All companies gain slightly (A 38.4 → 39.0, B 38.9 → 39.1, C unchanged at 28.8) and face fewer late penalties. The underlying blocking problem is not addressed."
+      },
+      {
+        "id": "keep",
+        "summary": "Stay at v1. On-time stays at 121.8, late at 10.4, blocked s at 2404, p95_wait_s at 188, max_wait_s at 385 and unfinished at 0.0.",
+        "stakeholders": "Customers keep the current promise but keep the long waits and the roughly 10 late deliveries. Companies keep their current utilities (38.4 / 38.9 / 28.8). No one is newly harmed, and no one benefits."
+      }
+    ],
+    "recommendation": {
+      "id": "1",
+      "reason": "Option 1 is the only option that substantially advances the main goal (+9.2 on-time, 5/5 seeds). It also improves every customer-facing watched metric: p95_wait_s falls from 188 to 81.4 and max_wait_s from 385 to 245, with unfinished held at 0.0. It does this without loosening the customer promise. Option 3 gives only +0.8 on 3/5 seeds, leaves actual waits unchanged and weakens the promise, so it does not meet the KPI's bar for a change that is worse for customers. The costs of option 1 are real and need a human decision: C's utility falls from 28.8 to 19.0, B's falls slightly, and road violations rise from 25.8 to 34.0. I recommend adopting option 1 together with an explicit human reason for setting aside the B and C votes, or a negotiated mitigation for C, and following up on the rise in road violations.",
+      "assumptions": [
+        "The human operators have the authority to adopt a rule change that some companies voted against, or to negotiate with them.",
+        "The 5-seed results represent the demand the town will see next period.",
+        "Companies will not change their behaviour (for example, parking strategy) in ways that cancel out the measured gain.",
+        "The increase in road violations does not reflect a safety problem serious enough to outweigh the customer gains."
+      ],
+      "predictions": [
+        {
+          "subject": "metric:on_time_deliveries",
+          "expected": "increase",
+          "note": "Measured 121.8 → 131.0 on the same seeds."
+        },
+        {
+          "subject": "metric:late_deliveries",
+          "expected": "decrease",
+          "note": "Measured 10.4 → 1.2."
+        },
+        {
+          "subject": "metric:blocked_s",
+          "expected": "decrease",
+          "note": "Measured 2404 → 985."
+        },
+        {
+          "subject": "metric:p95_wait_s",
+          "expected": "decrease",
+          "note": "Measured 188 → 81.4."
+        },
+        {
+          "subject": "metric:max_wait_s",
+          "expected": "decrease",
+          "note": "Measured 385 → 245."
+        },
+        {
+          "subject": "metric:unfinished",
+          "expected": "unchanged",
+          "note": "Measured 0.0 before and after."
+        },
+        {
+          "subject": "metric:road_violations",
+          "expected": "increase",
+          "note": "Measured 25.8 → 34.0; this is the main side cost."
+        },
+        {
+          "subject": "vote:A",
+          "expected": "yes",
+          "note": "A's utility rises from 38.4 to 45.4."
+        },
+        {
+          "subject": "vote:B",
+          "expected": "no",
+          "note": "B already voted ×; its utility falls from 38.9 to 37.2."
+        },
+        {
+          "subject": "vote:C",
+          "expected": "no",
+          "note": "C already voted ×; its utility falls from 28.8 to 19.0."
+        }
+      ]
+    },
+    "unknowns": [
+      "Why road violations rise from 25.8 to 34.0 under option 1, and whether any of them are safety-relevant.",
+      "Why C loses so much utility under option 1, and whether a mitigation would win B's or C's agreement (for example, a different eviction order or compensation).",
+      "Whether the constitution or the companies accept a human override of a rule change that a majority voted against.",
+      "Each company's future behaviour policy, including whether they would adapt their parking or routing to block_k 2.",
+      "How customers perceive a 150 s pickup promise compared with 120 s, beyond the measured wait times.",
+      "Next period's demand level and pattern. Only 5 seeds were measured, so robustness under different loads is unknown.",
+      "The combined effect of options 1 and 3, and intermediate settings such as other block_k values, which were not measured."
+    ]
+  }
+}

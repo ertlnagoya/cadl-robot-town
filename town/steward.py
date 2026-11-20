@@ -28,7 +28,8 @@
      - 不確か   ：判定はすべて通るが、改善したシードが 8 割に満たない
      - LLM      ：LLM 自身が、人間の判断が要ると書いた
   5. 判断と理由を decisions.md と gsn.yaml（図は gsn.md）に残し、次の期の LLM に渡す。
-     同じ記録を、機械で読める証拠 evidence.json（town/evidence.py）にも残す。
+     同じ記録を、仕様の付録 L の判断の記録 decisions.jsonl（town/decisions.py）にも残す。
+     --decider llm では、判断要求に人間に代わって LLM が答え、同じ形で記録する。
 
 判断要求への答えは、端末で打ち込むか、--answers の YAML に書く。
 端末がなく答えもないときは、判断要求を p<k>-request.md に書き出して止まる。
@@ -46,7 +47,7 @@ from pathlib import Path
 
 import yaml
 
-from . import evidence as ev
+from . import decisions as dr
 from . import kpi, llm_steward
 from .council import ballots, check_amendment, fmt, invariants_ok, read_params
 from .llm_council import MODE_NOTE, MODEL, _observation
@@ -85,6 +86,10 @@ class Cand:
     kpi_why: str = ""
     effect: str = ""                  # regulation：この規制が何を変えるか
     reasons: list = field(default_factory=list)
+    # 証拠のフィールド（付録 L）：LLM が書いた前提、分からないこと、予測
+    assumptions: list = field(default_factory=list)
+    unknowns: list = field(default_factory=list)
+    predictions: list = field(default_factory=list)
 
     def passed(self, *names: str) -> bool:
         return all(self.gates.get(n) for n in names)
@@ -276,6 +281,8 @@ class Answers:
                 if not isinstance(g, dict) or not g.get("type") or not g.get("text"):
                     raise SystemExit(M("a_gsn", rid=rid))
             ans = dict(given)
+            if not str(ans.get("reason") or "").strip():
+                raise SystemExit(M("a_noreason", rid=rid))
             ans["choice"] = str(ans["choice"])
             if ans["choice"] not in ids:
                 raise SystemExit(M("a_bad", rid=rid, id=ans["choice"], ids=", ".join(ids)))
@@ -286,7 +293,9 @@ class Answers:
                     choice = input(M("a_choose", ids=" / ".join(ids))).strip()
                     if choice in ids:
                         break
-                reason = input(M("a_reason_q")).strip()
+                reason = ""
+                while not reason:
+                    reason = input(M("a_reason_q")).strip()
                 assumptions = []
                 while (a := input(M("a_assume_q")).strip()):
                     assumptions.append(a)
@@ -318,6 +327,21 @@ def decisions_brief(log: list[dict]) -> str:
     return "\n".join(out)
 
 
+def measure_items(spec: dict) -> list[dict]:
+    """KPI の評価方法を、付録 L の測り方の項目に。"""
+    out = []
+    for i, g in enumerate(spec["goals"]):
+        sign = kpi.METRICS[g["metric"]][1]
+        t = g.get("target")
+        out.append({"metric": g["metric"], "role": "goal" if i == 0 else "watch",
+                    "direction": "increase" if sign > 0 else "decrease",
+                    "target": None if t is None else f"{'>=' if sign > 0 else '<='} {t:g}"})
+    for g in spec.get("guards") or []:
+        out.append({"metric": g["metric"], "role": "guard", "direction": None,
+                    "target": f"{g['op']} {g['value']:g}"})
+    return out
+
+
 def main() -> int:
     global M
     const0 = yaml.safe_load(CONSTITUTION.read_text(encoding="utf-8"))
@@ -332,6 +356,10 @@ def main() -> int:
                    help="live は LLM を呼ぶ（--replay-dir に記録があればそれを使う）。replay は記録だけを使う")
     p.add_argument("--replay-dir", type=Path, help="LLM の出力の記録（p<k>-kpi.json など）の場所")
     p.add_argument("--answers", type=Path, help="判断要求への答えの YAML。なければ端末で聞く")
+    p.add_argument("--decider", default="human", choices=["human", "llm"],
+                   help="判断要求に答える者。llm では、人間に代わって LLM が答え、その証拠を同じ形で残す")
+    p.add_argument("--layers", default="rule,contract,regulation",
+                   help="改正案として扱う層（カンマ区切り）。ほかの層の案は測らずに除く")
     p.add_argument("--name", default=dt.datetime.now().strftime("%Y%m%d-%H%M%S"))
     args = p.parse_args()
     if args.llm == "replay" and not args.replay_dir:
@@ -348,17 +376,16 @@ def main() -> int:
     rec = llm_steward.Recorder(run_dir, args.llm, args.replay_dir, M)
     answers = Answers(args.answers, run_dir / "answers.yaml")
     gsn = Gsn(M)
-    import cadl
-    evid = ev.Evidence(run_dir, {
-        "name": args.name, "tool": "town.steward", "mode": args.mode, "lang": args.lang,
-        "rounds": args.rounds, "llm": args.llm, "model": MODEL,
-        "replay_dir": str(args.replay_dir) if args.replay_dir else None,
-        "cadl": getattr(cadl, "__version__", None)},
-        {"rules": args.rules, "constitution": CONSTITUTION, "scenario": SCENARIO, "kpi": kpi_path,
-         **({"answers": args.answers} if args.answers else {})})
+    layers = {x.strip() for x in args.layers.split(",") if x.strip()}
     text = args.rules.read_text(encoding="utf-8")
     version, const_version = 1, 1
     (run_dir / "v1.cadl").write_text(text, encoding="utf-8")
+    decider = "operator" if args.decider == "human" else "llm-decider"
+    record = dr.Record(run_dir, "RobotTown", run_dir / "v1.cadl",
+                       dr.parties("steward", "cadl-robot-town town.steward", MODEL, "llm", args.decider),
+                       M("dr_time_base"))
+    gen = lambda req: {"model": MODEL, "request_digest": llm_steward.request_digest(req)}
+    kpi_in_force = None                 # 有効な KPI の記録（K<k>.d、または書かれた KPI の K<k>）
     ir = compile_rules(run_dir / "v1.cadl")
     history: list[str] = []
     log: list[dict] = []
@@ -370,7 +397,36 @@ def main() -> int:
         gsn.save(run_dir / "gsn.yaml")
         (run_dir / "decisions.md").write_text("\n".join(md) + "\n", encoding="utf-8")
         (run_dir / "history.md").write_text(M("history_title") + "".join(history), encoding="utf-8")
-        evid.save(gsn.nodes)                    # 最後に：ほかのファイルのハッシュを残すため
+        record.save(complete=False)
+
+    def decide(rid: str, ids: list[str], rpath: Path, k: int, options_text: str) -> dict:
+        """判断要求への答え：人間（--answers か端末）か、人間に代わる LLM。"""
+        if args.decider == "human":
+            ans = dict(answers.ask(rid, ids, rpath))
+            ans["by"] = "operator"
+            return ans
+        req = llm_steward.decide_request(rpath.read_text(encoding="utf-8"), options_text,
+                                         decisions_brief(log), args.lang)
+        data, dnote = rec.get(f"p{k}-{'kpi-' if rid.startswith('K') else ''}decide", req)
+        if data is None or str(data.get("choice")) not in ids or not str(data.get("reason")).strip():
+            finish()
+            raise SystemExit(M("llm_decide_fail", rid=rid, note=dnote))
+        print(M("llm_decided", rid=rid, note=M.note(dnote), id=data["choice"], reason=data["reason"]))
+        ans = {"choice": str(data["choice"]), "reason": data["reason"],
+               "assumptions": data.get("assumptions") or [], "unknowns": data.get("unknowns") or [],
+               "predictions": data.get("predictions") or [],
+               "follow_ups": [{"text": f["text"], "due": f.get("due_period")}
+                              for f in data.get("follow_ups") or []],
+               "by": "llm-decider", "generated": gen(req)}
+        answers.used[rid] = {kk: v for kk, v in ans.items() if kk not in ("by", "generated")}
+        return ans
+
+    def follow_ups(rid: str, k: int, ans: dict) -> None:
+        for n, f in enumerate(ans.get("follow_ups") or [], 1):
+            due = f.get("due")
+            record.add(f"{rid}.f{n}", "follow_up", ans["by"], k, text=str(f["text"]),
+                       due={"period": int(due)} if isinstance(due, int) and due >= 1 else None,
+                       decision=rid)
 
     for k in range(1, args.rounds + 1):
         env = periods[(k - 1) % len(periods)]
@@ -396,9 +452,8 @@ def main() -> int:
             md += [M("kpi_sec", k=k, since=since, how=M("written")), M("md_kpi", text=shown),
                    M("md_written", desc=kpi.describe(spec, M)), ""]
             kpi_goal = gsn.add("goal", M("gsn_kpi", since=since, text=shown), gsn.by_version, ref=f"K{k}")
-            evid.add({"id": f"K{k}", "type": "kpi", "period": k, "since": since, "text": shown,
-                      "how": "written", "measure": spec, "measure_text": kpi.describe(spec, M),
-                      "decision": {"by": "human", "choice": None, "reason": None, "assumptions": []}})
+            kpi_in_force = record.add(f"K{k}", "objective", "operator", k, text=shown,
+                                      measure=measure_items(spec))
             gsn.add("context", M("gsn_measure", who=M("by_written"), desc=kpi.describe(spec, M)), kpi_goal)
             log.append({"id": f"K{k}", "period": k, "who": M("human"),
                         "summary": M("log_kpi", text=shown[:60], desc=kpi.describe(spec, M)), "reason": ""})
@@ -438,40 +493,65 @@ def main() -> int:
                 print(M("concern", text=c))
             for r in data["revisit"]:
                 print(M("revisit", d=r["decision"], why=r["why"]))
+            kgen = gen(llm_steward.kpi_request(new_kpi, since, kpi_text, decisions_brief(log), args.lang))
+            record.add(f"K{k}", "objective", "operator", k, text=new_kpi, measure=None)
+            for i, o in opts:
+                record.add(f"K{k}.r{i}", "proposal", "llm", k, generated=kgen, kind="measure",
+                           title=o["label"], changes=None, objective=f"K{k}", measure=measure_items(o),
+                           affected=[], **dr.evidence(o["note"] or o["label"]))
             if ask:
                 rpath = run_dir / f"p{k}-kpi-request.md"
                 rpath.write_text("\n".join(sec) + "\n", encoding="utf-8")
                 print(M("kpi_ask", k=k, id=data["recommended"]))
-                ans = answers.ask(f"K{k}", [i for i, _ in opts], rpath)
+                kids = [f"K{k}.r{i}" for i, _ in opts]
+                record.add(f"K{k}.req", "request", "steward", k, to=decider,
+                           question=M("dr_kpi_q", since=since), options=kids,
+                           why=[{"option": x, "reason": M("dr_kpi_why")} for x in kids])
+                record.add(f"K{k}.rec", "recommendation", "llm", k, basis=[f"K{k}.req"], generated=kgen,
+                           request=f"K{k}.req",
+                           options=[{"option": f"K{k}.r{i}", "summary": kpi.describe(o, M),
+                                     "affected": ""} for i, o in opts],
+                           recommends=(f"K{k}.r{data['recommended']}"
+                                       if data["recommended"] != "—" else None),
+                           **dr.evidence(data["interpretation"],
+                                         unknowns=data["concerns"]
+                                         + [f"{x['decision']}: {x['why']}" for x in data["revisit"]]))
+                ans = decide(f"K{k}", [i for i, _ in opts], rpath, k,
+                             "\n".join(f"- {i}: {o['label']}（{kpi.describe(o, M)}）" for i, o in opts))
                 spec = dict(opts[[i for i, _ in opts].index(ans["choice"])][1])
-                md.append(M("md_chosen", id=ans["choice"], label=spec["label"]))
+                md.append(M("md_chosen" if ans["by"] == "operator" else "md_chosen_llm",
+                            id=ans["choice"], label=spec["label"]))
                 if ans.get("reason"):
-                    md.append(M("md_reason", text=ans["reason"]))
+                    md.append(M("md_reason" if ans["by"] == "operator" else "md_reason_llm",
+                                text=ans["reason"]))
                 for a in ans.get("assumptions") or []:
-                    md.append(M("md_assume", text=a))
+                    md.append(M("md_assume" if ans["by"] == "operator" else "md_assume_llm", text=a))
             else:
                 ans, spec = None, dict(opts[0][1])
             md.append("")
             kpi_goal = gsn.add("goal", M("gsn_kpi", since=since, text=new_kpi), gsn.by_version, ref=f"K{k}")
-            evid.add({"id": f"K{k}", "type": "kpi", "period": k, "since": since, "text": new_kpi,
-                      "how": "llm", "interpretation": data["interpretation"],
-                      "options": [{"id": i, "label": o["label"], "measure_text": kpi.describe(o, M),
-                                   "note": o["note"]} for i, o in opts],
-                      "concerns": data["concerns"], "revisit": data["revisit"],
-                      "recommended": str(data["recommended"]),
-                      "measure": spec, "measure_text": kpi.describe(spec, M),
-                      "llm_record": f"llm/p{k}-kpi.json",
-                      "request_file": f"p{k}-kpi-request.md" if ask else None,
-                      "decision": {"by": "human" if ans else "tool",
-                                   "choice": ans["choice"] if ans else opts[0][0],
-                                   "followed_llm": (ans["choice"] == str(data["recommended"])) if ans else None,
-                                   "reason": (ans or {}).get("reason") or None,
-                                   "assumptions": (ans or {}).get("assumptions") or []}})
+            kids = [f"K{k}.r{i}" for i, _ in opts]
+            if ans:
+                kpi_in_force = record.add(
+                    f"K{k}.d", "decision", ans["by"], k,
+                    basis=[f"K{k}"] + kids + [f"K{k}.req", f"K{k}.rec"],
+                    fulfils=ans.get("fulfils") or [], generated=ans.get("generated"),
+                    question=M("dr_kpi_q", since=since), options=kids, choice=f"K{k}.r{ans['choice']}",
+                    procedure="single", rule=None, affected=[], result=None,
+                    **dr.evidence(ans["reason"], ans.get("assumptions"), ans.get("unknowns"),
+                                  dr.predictions(ans.get("predictions"), f"K{k}.r{ans['choice']}")))
+                follow_ups(f"K{k}.d", k, ans)
+            else:
+                kpi_in_force = record.add(
+                    f"K{k}.d", "decision", "steward", k, basis=[f"K{k}"] + kids,
+                    question=None, options=kids, choice=kids[0], procedure="automatic",
+                    rule=M("dr_kpi_rule"), affected=[], result=None, **dr.evidence(None))
             gsn.add("context", M("gsn_measure", who=M("by_human") if ans else M("by_llm"),
                                  desc=kpi.describe(spec, M)), kpi_goal)
             if ans:
                 attach_answer(gsn, kpi_goal, ans)
-            log.append({"id": f"K{k}", "period": k, "who": M("human") if ans else M("auto"),
+            log.append({"id": f"K{k}", "period": k,
+                        "who": (M("human") if ans["by"] == "operator" else M("llm_decider")) if ans else M("auto"),
                         "summary": M("log_kpi", text=new_kpi[:60], desc=kpi.describe(spec, M)),
                         "reason": (ans or {}).get("reason", "")})
             revisit = "\n".join(f"- {r['decision']}: {r['why']}" for r in data["revisit"])
@@ -505,12 +585,19 @@ def main() -> int:
         if data["assessment"]:
             print(M("assessment", text=data["assessment"]))
         cands = [Cand(str(i), x["title"], x["rationale"], "amend", text=x["cadl"],
-                      llm_flag=x.get("why_human", "") if x.get("needs_human") else "")
+                      llm_flag=x.get("why_human", "") if x.get("needs_human") else "",
+                      assumptions=x.get("assumptions") or [], unknowns=x.get("unknowns") or [],
+                      predictions=x.get("predictions") or [])
                  for i, x in enumerate((data.get("proposals") or [])[:llm_steward.MAX_PROPOSALS], 1)]
         for c in cands:
             measure_amend(c, run_dir / f"p{k}-{c.cid}.cadl", text, cur, cur_vals, const, spec, sim)
+        dropped = [c for c in cands if c.layer and c.layer not in layers]
+        for c in dropped:
+            print(M("layer_dropped", id=c.cid, label=c.label or c.title, layer=c.layer))
+        cands = [c for c in cands if c not in dropped]
         regs = [Cand(f"R{i}", x["title"], x["rationale"], "regulation", key=x["key"], value=x["value"])
-                for i, x in enumerate((data.get("regulation_proposals") or [])[:1], 1)]
+                for i, x in enumerate((data.get("regulation_proposals") or [])[:1], 1)
+                if "regulation" in layers]
         for c in regs:
             measure_regulation(c, const, cur, cands)
         cands += regs
@@ -522,6 +609,28 @@ def main() -> int:
             + "".join("\n" + M("item", id=c.cid, label=c.title, text=c.rationale) for c in cands) + "\n",
             encoding="utf-8")
         print("  " + evidence.replace("\n", "\n  "))
+        pid = lambda cid: f"P{k}.{cid}"
+        m0 = record.measurement(f"P{k}.m0", "steward", k, "in_force", cur, cur_vals, sim,
+                                version=f"v{version}")
+        period_entries = [m0]
+        pgen = gen(req)
+        for c in cands:
+            layer = c.layer or None
+            period_entries.append(record.add(
+                pid(c.cid), "proposal", "llm", k, generated=pgen, kind="amendment", title=c.title,
+                changes=dr.change(c.label, layer), objective=None, measure=None,
+                affected=["customers"] if layer == "contract" else [],
+                **dr.evidence(c.rationale or c.title, c.assumptions, c.unknowns,
+                              dr.predictions(c.predictions, pid(c.cid)))))
+            if c.vals is not None:
+                period_entries.append(record.measurement(
+                    f"{pid(c.cid)}.m", "steward", k, pid(c.cid), c.m, c.vals, sim,
+                    compared_with=m0, runs_better=c.seeds_better))
+            period_entries.append(record.checks(
+                f"{pid(c.cid)}.c", "steward", k, pid(c.cid), c.gates,
+                "; ".join(x for x in (c.why, c.kpi_why, c.effect) if x)))
+            if c.votes:
+                period_entries += record.votes(pid(c.cid), k, pid(c.cid), c.votes)
 
         # 4. 自動で採択するか、人間に判断を求めるか
         md.append(M("d_sec", k=k, label=label(env), how=M("asked") if escalated else M("auto")))
@@ -568,7 +677,27 @@ def main() -> int:
             print(M("reco", id=rdata["recommendation"]["id"], reason=rdata["recommendation"]["reason"]))
             for u in rdata["unknowns"]:
                 print(M("unknown", text=u))
-            ans = answers.ask(f"D{k}", ids, rpath)
+            oid = lambda i: KEEP if i == KEEP else pid(i)
+            record.add(f"D{k}.req", "request", "steward", k, to=decider, question=rdata["question"],
+                       options=[oid(i) for i in ids],
+                       why=[{"option": pid(c.cid), "reason": reason_text(c, spec)} for c in escalated])
+            period_entries.append(f"D{k}.req")
+            if M("tmpl_note") not in rnote:
+                reco_ = rdata["recommendation"]
+                record.add(f"D{k}.rec", "recommendation", "llm", k, basis=[f"D{k}.req"],
+                           generated=gen(llm_steward.request_request(
+                               kpi_text, kpi.describe(spec, M), reasons, evidence, opt_text,
+                               decisions_brief(log), args.lang)),
+                           request=f"D{k}.req",
+                           options=[{"option": oid(o["id"]), "summary": o["summary"],
+                                     "affected": o["stakeholders"]} for o in rdata["options"]
+                                    if o["id"] in ids],
+                           recommends=oid(reco_["id"]) if reco_["id"] in ids else None,
+                           **dr.evidence(reco_["reason"], reco_.get("assumptions"), rdata["unknowns"],
+                                         dr.predictions(reco_.get("predictions"),
+                                                        oid(reco_["id"]) if reco_["id"] in ids else KEEP)))
+                period_entries.append(f"D{k}.rec")
+            ans = decide(f"D{k}", ids, rpath, k, opt_text)
             chosen = next((c for c in options if c.cid == ans["choice"]), None)
             md.append(M("md_whyasked") + "\n" + "\n".join("  " + x for x in reasons.splitlines()))
             md.append(M("md_request", k=k, q=rdata["question"]))
@@ -595,15 +724,20 @@ def main() -> int:
             (run_dir / f"constitution-v{const_version}.yaml").write_text(
                 yaml.safe_dump(const, allow_unicode=True, sort_keys=False), encoding="utf-8")
             what = M("reg_adopted", label=chosen.label, v=const_version)
-        who = M("human") if ans else M("auto")
+        who = (M("human") if ans["by"] == "operator" else M("llm_decider")) if ans else M("auto")
         print(M("outcome", who=who, what=what))
         history.append(M("history", k=k, label=label(env), what=what, who=who))
         md.append(M("md_result", who=who, what=what))
         if ans:
+            human = ans["by"] == "operator"
             if ans.get("reason"):
-                md.append(M("md_reason", text=ans["reason"]))
+                md.append(M("md_reason" if human else "md_reason_llm", text=ans["reason"]))
             for a in ans.get("assumptions") or []:
-                md.append(M("md_assume", text=a))
+                md.append(M("md_assume" if human else "md_assume_llm", text=a))
+            for u in ans.get("unknowns") or []:
+                md.append(M("md_unknown_d", text=u))
+            for f in ans.get("follow_ups") or []:
+                md.append(M("md_follow_up", text=f["text"], due=f.get("due") or "—"))
             for g in ans.get("gsn") or []:
                 md.append(M("md_gsn", type=g["type"], text=g["text"]))
         md.append("")
@@ -614,46 +748,64 @@ def main() -> int:
             attach_answer(gsn, s, ans)
         else:
             gsn.add("justification", M("gsn_j_auto") if chosen else M("gsn_j_none"), s, by="tool")
-        reco = (rdata or {}).get("recommendation") or {}
-        choice = ans["choice"] if ans else (chosen.cid if chosen else KEEP)
-        evid.add({
-            "id": f"D{k}", "type": "decision", "period": k,
-            "env": {"label": label(env), "order_interval_s": env["order_interval_s"], "rush": env.get("rush"),
-                    "seeds": seeds},
-            "kpi": next(r["id"] for r in reversed(evid.doc["records"]) if r["type"] == "kpi"),
-            "version_in_force": v_before, "constitution_version": cv_before,
-            "current": {"metrics": ev.rounded(cur_vals), "utility": ev.utilities(cur)},
-            "achievement": ach or None,
-            "assessment": data["assessment"] or None,
-            "candidates": [ev.candidate(c, reason_text(c, spec) if c.reasons else "") for c in cands],
-            "auto_best": best.cid if best else None,
-            "escalated": [c.cid for c in escalated],
-            "request": None if not escalated else {
-                "question": rdata["question"], "recommendation": reco.get("id"),
-                "recommendation_reason": reco.get("reason"), "unknowns": rdata["unknowns"],
-                "options": rdata["options"], "file": f"p{k}-request.md",
-                "llm_record": f"llm/p{k}-request.json"},
-            "llm_record": f"llm/p{k}-propose.json", "evidence_file": f"p{k}-evidence.md",
-            "decision": {
-                "by": "human" if ans else "tool", "choice": choice, "outcome": what,
-                "adopted": chosen.cid if chosen else None,
-                "adopted_kind": chosen.kind if chosen else None,
-                "vote_overridden": bool(chosen is not None and chosen.kind == "amend"
-                                        and not chosen.gates.get("vote")),
-                "followed_llm": (choice == str(reco.get("id"))) if ans and reco else None,
-                "reason": (ans or {}).get("reason") or None,
-                "assumptions": (ans or {}).get("assumptions") or [],
-                "gsn": (ans or {}).get("gsn") or [],
-                "version_after": version, "constitution_version_after": const_version,
-                "version_file": f"v{version}.cadl" if version != v_before else None},
-        })
+        # 判断の記録（付録 L）：人間でも LLM でもツールでも、同じ形で
+        if escalated:
+            opts_ = [pid(c.cid) for c in options] + [KEEP]
+            first = escalated[0]
+            if chosen is not None:
+                considered = chosen
+            else:
+                considered = first
+            # 手続き（付録 L、L-6）：投票が結果を決めたか、判断した者が投票を覆したか、
+            # 投票ではなくほかの判定や判断した者自身の判断で決まったか
+            others_ok = considered.passed("check", "const", "inv", "kpi_guard", "gain", "seeds")
+            if considered.layer != "rule" or not considered.votes:
+                procedure = "single"
+            elif chosen is not None:
+                procedure = "vote" if chosen.gates.get("vote") else "override"
+            elif not first.gates.get("vote"):
+                procedure = "vote"              # 否決のとおりに変えない
+            else:
+                procedure = "override" if others_ok else "single"
+            choice_id = pid(chosen.cid) if chosen is not None else KEEP
+            dev = dr.evidence(ans["reason"], ans.get("assumptions"), ans.get("unknowns"),
+                              dr.predictions([{**x, "option": (pid(x["option"]) if x.get("option")
+                                                               not in (None, KEEP) else x.get("option"))}
+                                              for x in ans.get("predictions") or []], choice_id))
+            record.add(f"D{k}", "decision", ans["by"], k,
+                       basis=[kpi_in_force] + period_entries, fulfils=ans.get("fulfils") or [],
+                       generated=ans.get("generated"), question=rdata["question"], options=opts_,
+                       choice=choice_id, procedure=procedure, rule=None,
+                       affected=(["customers"] if chosen is not None and chosen.layer == "contract" else [])
+                       + ([x for x in sorted(chosen.votes) if not chosen.votes[x]]
+                          if chosen is not None and chosen.votes else []),
+                       result=f"v{version}", **dev)
+            follow_ups(f"D{k}", k, ans)
+        else:
+            record.add(f"D{k}", "decision", "steward", k, basis=[kpi_in_force] + period_entries,
+                       question=None, options=[pid(c.cid) for c in cands] + [KEEP],
+                       choice=pid(chosen.cid) if chosen is not None else KEEP, procedure="automatic",
+                       rule=M("dr_auto_rule"), affected=[], result=f"v{version}",
+                       **dr.evidence(what if chosen is not None else None))
+        if chosen is not None and chosen.kind == "amend":
+            record.add(f"V{version}", "version", "steward", k, version=f"v{version}",
+                       previous=f"v{version - 1}", effective={"period": k + 1},
+                       source_sha256=dr.sha256(run_dir / f"v{version}.cadl"), decision=f"D{k}")
+        elif chosen is not None:
+            cfile = run_dir / f"constitution-v{const_version}.yaml"
+            record.add(f"C{const_version}", "note", "steward", k,
+                       attachments=[{"path": cfile.name, "sha256": dr.sha256(cfile),
+                                     "media_type": "application/yaml"}],
+                       text=M("dr_constitution", v=const_version, label=chosen.label))
         log.append({"id": f"D{k}", "period": k, "who": who, "summary": what,
                     "reason": (ans or {}).get("reason", "")})
         for f in run_dir.glob(f"p{k}-*.cadl"):          # 不採択の案は消し、採択したバージョンだけを残す
             f.unlink()
         finish()
 
+    anchor = record.save(complete=True)
     print(M("done", dir=run_dir.relative_to(ROOT), v=version))
+    print(M("dr_saved", path=(run_dir / dr.FILE).relative_to(ROOT), anchor=anchor))
     return 0
 
 

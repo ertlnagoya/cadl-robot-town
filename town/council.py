@@ -22,6 +22,8 @@
 - llm：LLM が観測を読んで改正案（CADL ファイル全体）を書く（town/llm_council.py）
 - replay：--replay-dir に保存した LLM の案を再生する
 比較は同じ乱数シードで行う。採択された規則は runs/<名前>/ にバージョンとして残る。
+判断の記録（仕様の付録 L）を runs/<名前>/decisions.jsonl に書き出す。改正案、測定、判定、
+各社の投票、委員会（ツール）による自動の採択を、`cadl decisions-verify` で検査できる。
 
 第 k 期の環境（需要）は scenario.yaml の periods[k-1] で決まる。現行の
 規則も、その期の環境で評価し直してから改正案と比べる。
@@ -36,7 +38,8 @@ from pathlib import Path
 
 import yaml
 
-from . import llm_council
+from . import decisions as dr
+from . import kpi, llm_council
 from .period import (CONSTITUTION, DEFAULT_RULES, ROOT, SCENARIO, CompileError,
                      compile_rules, evaluate)
 
@@ -204,6 +207,20 @@ def main() -> int:
     except CompileError as e:
         print(f"[REJECT] 現行の規則が検査を通りません。\n{e}")
         return 1
+    proposer = "tool" if args.proposer == "neighbors" else "llm"
+    record = dr.Record(run_dir, "RobotTown", run_dir / "v1.cadl",
+                       dr.parties("council", "cadl-robot-town town.council",
+                                  llm_council.MODEL if proposer == "llm" else None, proposer, "tool"),
+                       "ロボットの街のシミュレーションの 1 時間（1 期）")
+    direction = "increase" if args.objective == "on_time_deliveries" else "decrease"
+    metric = {"violations": "violation_total"}.get(args.objective, args.objective)
+    objective = record.add("K1", "objective", "operator", 1,
+                           text=f"委員会の目標: {args.objective}（{'大きいほどよい' if direction == 'increase' else '小さいほどよい'}）",
+                           measure=[{"metric": metric, "role": "goal", "direction": direction,
+                                     "target": None}])
+    rule = (f"検査・憲法・不変条件を通り、目標 {args.objective} が min_improvement "
+            f"{const['min_improvement']} 以上改善し、{const['vote']['quorum']} 社以上が賛成した案のうち、"
+            "改善が最も大きいものを採択する。なければ変えない")
 
     for rnd in range(1, args.rounds + 1):
         env = periods[(rnd - 1) % len(periods)]
@@ -211,6 +228,11 @@ def main() -> int:
         interval = env["order_interval_s"]
         rush = env.get("rush")
         cur = evaluate(ir, seeds, period, interval, args.mode, rush)
+        sim = {"seeds": seeds, "period_s": period, "order_interval_s": interval}
+        m0 = record.measurement(f"P{rnd}.m0", "council", rnd, "in_force", cur, kpi.measure(cur), sim,
+                                version=f"v{version}")
+        entries = [objective, m0]
+        pgen = None
         params = read_params(text)
         print(f"\n=== 第 {rnd} 期（{env['label']}：注文の平均間隔 {interval:g} 秒）"
               f"  現行 v{version}: "
@@ -230,9 +252,11 @@ def main() -> int:
                           f"user {len(req['messages'][0]['content'])} 字。LLM は呼ばずに終わります。")
                     return 0
                 proposals, note, view = llm_council.propose_llm(req)
+                pgen = {"model": llm_council.MODEL, "request_digest": llm_council.digest(req)}
                 llm_council.save(run_dir / f"llm-round{rnd}.json", proposals, note, view, req)
             else:
                 proposals, note, view = llm_council.replay(args.replay_dir / f"llm-round{rnd}.json", req)
+                pgen = {"model": llm_council.MODEL, "request_digest": llm_council.digest(req)}
             print(f"  LLM の委員会: {note}、{len(proposals)} 件")
             if view:
                 print(f"  所見: {view}")
@@ -240,6 +264,22 @@ def main() -> int:
         best = None
         for i, prop in enumerate(proposals, 1):
             label, cand_text = prop["title"][:38], prop["cadl"]
+            pid = f"P{rnd}.{i}"
+            old_p, new_p = read_params(text), None
+            try:
+                new_p = read_params(cand_text)
+            except Exception:
+                pass
+            moved = [(k, old_p[k], new_p[k]) for k in old_p
+                     if new_p and k in new_p and abs(old_p[k] - new_p[k]) > 1e-9]
+            changes = ([{"parameter": k, "from": f"{a:g}", "to": f"{b:g}",
+                         "layer": const["amendable"].get(k, {}).get("layer")} for k, a, b in moved]
+                       or dr.change(prop["title"], None))
+            reason = prop.get("rationale") or f"neighbors: {prop['title']}（1 つのパラメータを 1 ステップ動かす案）"
+            entries.append(record.add(pid, "proposal", "llm" if proposer == "llm" else "council", rnd,
+                                      generated=pgen, kind="amendment", title=prop["title"],
+                                      changes=changes, objective=None, measure=None, affected=[],
+                                      **dr.evidence(reason)))
             if prop.get("rationale"):
                 print(f"  [{i}] {prop['title']}\n      {prop['rationale']}")
             path = run_dir / f"round{rnd}-{i}.cadl"
@@ -249,10 +289,13 @@ def main() -> int:
             except CompileError as e:
                 first = str(e).splitlines()[0] if str(e) else ""
                 print(f"  {label:38s}       -     -      -          -    ×    -    -    -     {first}")
+                entries.append(record.checks(f"{pid}.c", "council", rnd, pid, {"check": False}, first))
                 continue
             ok_text, why = check_amendment(text, cand_text, const["amendable"])
             if not ok_text:
                 print(f"  {label:38s}       -     -      -          -    ○    ×    -    -     {why}")
+                entries.append(record.checks(f"{pid}.c", "council", rnd, pid,
+                                             {"check": True, "const": False}, why))
                 continue
             m = evaluate(cand_ir, seeds, period, interval, args.mode, rush)
             ok_inv, why = invariants_ok(m, const["invariants"])
@@ -261,19 +304,32 @@ def main() -> int:
             votes = ballots(cur, m)
             ok_vote = sum(votes.values()) >= const["vote"]["quorum"]
             v = " ".join("○" if votes[c] else "×" for c in sorted(votes))
+            entries.append(record.measurement(f"{pid}.m", "council", rnd, pid, m, kpi.measure(m), sim,
+                                              compared_with=m0))
+            entries.append(record.checks(f"{pid}.c", "council", rnd, pid,
+                                         {"check": True, "const": True, "inv": ok_inv,
+                                          "gain": ok_gain, "vote": ok_vote},
+                                         f"{args.objective} {gain:+.2f}" + (f"; {why}" if why else "")))
+            entries += record.votes(pid, rnd, pid, votes)
             mark = lambda b: "○" if b else "×"
             print(f"  {label:38s} {m['on_time_deliveries']:7.1f} {m['violation_total']:5.1f}"
                   f" ({m['road_violations']:4.1f}) {m['blocked_s']:8.0f}s"
                   f"    ○    {mark(ok_inv)}    {mark(ok_gain)}   {v}"
                   + (f"   {why}" if why else ""))
             if ok_inv and ok_gain and ok_vote and (best is None or gain > best[0]):
-                best = (gain, cand_text, cand_ir, m, votes)
+                best = (gain, cand_text, cand_ir, m, votes, pid)
 
+        options = [e for e in entries if e.startswith(f"P{rnd}.") and e.count(".") == 1
+                   and e != f"P{rnd}.m0"] + ["keep"]
         if best is None:
             print("  → 採択なし（すべての案がどこかの判定で除かれた）。規則は変わらない。")
             history.append(f"- 第 {rnd} 期（{env['label']}）: 採択なし\n")
+            record.add(f"D{rnd}", "decision", "council", rnd, basis=entries, question=None,
+                       options=options, choice="keep", procedure="automatic", rule=rule,
+                       affected=[], result=f"v{version}", **dr.evidence(None))
+            record.save()
             continue
-        gain, new_text, ir, cur, votes = best
+        gain, new_text, ir, cur, votes, best_id = best
         (name, (old, new)), = {k: (a, read_params(new_text)[k]) for k, a in read_params(text).items()
                                if abs(a - read_params(new_text)[k]) > 1e-9}.items()
         text = new_text
@@ -284,11 +340,22 @@ def main() -> int:
         print(f"  → 採択: {label}（目標 {gain:+.1f}，賛成 {yes}）。v{version}.cadl として保存。")
         history.append(f"- 第 {rnd} 期（{env['label']}）: v{version} {label}"
                        f"（目標 {gain:+.1f}，賛成 {yes}）\n")
+        record.add(f"D{rnd}", "decision", "council", rnd, basis=entries, question=None,
+                   options=options, choice=best_id, procedure="automatic", rule=rule,
+                   affected=[c for c in sorted(votes) if not votes[c]], result=f"v{version}",
+                   **dr.evidence(f"{label}（目標 {gain:+.1f}，賛成 {yes}）"))
+        record.add(f"V{version}", "version", "council", rnd, version=f"v{version}",
+                   previous=f"v{version - 1}", effective={"period": rnd + 1},
+                   source_sha256=dr.sha256(run_dir / f"v{version}.cadl"), decision=f"D{rnd}")
+        record.save()
 
     for f in run_dir.glob("round*.cadl"):          # 不採択の案は消し、採択したバージョンだけを残す
         f.unlink()
     (run_dir / "history.md").write_text("".join(history), encoding="utf-8")
+    anchor = record.save(complete=True)
     print(f"\nバージョンと履歴: {run_dir.relative_to(ROOT)}/  （v1.cadl 〜 v{version}.cadl, history.md）")
+    print(f"判断の記録: {(run_dir / dr.FILE).relative_to(ROOT)}（cadl decisions-verify で検査。"
+          f"最後の行の digest {anchor} を記録の外に残すと、書き換えを検出できる）")
     return 0
 
 

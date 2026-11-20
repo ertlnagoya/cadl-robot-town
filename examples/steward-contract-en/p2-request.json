@@ -1,0 +1,61 @@
+{
+  "note": "claude-opus-5-5、入力 3611 / 出力 2049 トークン",
+  "request_digest": "f01c49e9d8520b7a",
+  "data": {
+    "question": "Should the road rule block_k be changed from 2 to 1, so that a road holder is evicted as soon as one robot waits behind it, or should the town stay at v2?",
+    "background": "On average, option 1 raises on-time deliveries by +1.2 (223.8 to 225.0), but only 2 of 5 seeds improve. The main-goal gain is therefore within noise, and I cannot tell whether it is real. It does show large improvements in the customer-wait metrics: p95_wait_s falls from 110 to 93.0 and max_wait_s from 201 to 129. Against that, C's utility falls from 56.3 to 40.1 and C votes against it, after C already lost heavily under D1. Weighing an uncertain main-goal gain and clear customer-wait gains against a second override of C is a judgment the operator should make, not me.",
+    "options": [
+      {
+        "id": "1",
+        "summary": "Adopt block_k 2 → 1 (rule). On-time 223.8 → 225.0 (+1.2, 2/5 seeds improved). Late 4.2 → 3.0. Blocked s 936 → 130. p95_wait_s 110 → 93.0. max_wait_s 201 → 129. Unfinished stays 0.0. Lowest on-time rate 0.97 → 0.98. Road violations 28.0 → 29.8. Passes check, the constitution and the KPI conditions. Utility A/B/C 73.4/65.5/56.3 → 73.4/74.2/40.1. Votes: A yes, B yes, C no, so adopting it overrides C.",
+        "stakeholders": "Customers gain shorter waits, especially at the tail (max wait 201 → 129), and slightly fewer late deliveries, though the on-time gain is not consistent across seeds. B gains clearly (65.5 → 74.2) and A is unchanged. C loses heavily (56.3 → 40.1) for the second period in a row, with the D1 mitigation still not in place. Road users face slightly more road violations (28.0 → 29.8), whose cause has not been examined."
+      },
+      {
+        "id": "keep",
+        "summary": "Stay at v2 (block_k 2). On-time 223.8, late 4.2, blocked s 936, p95_wait_s 110, max_wait_s 201, unfinished 0.0, road violations 28.0. Utility A/B/C stays 73.4/65.5/56.3.",
+        "stakeholders": "C avoids a further large loss and is not overridden again. A is unaffected. B gives up a gain of about 8.7 utility. Customers keep the current, already good service (lowest on-time rate 0.97) but miss the shorter tail waits that option 1 would bring."
+      }
+    ],
+    "recommendation": {
+      "id": "keep",
+      "reason": "The KPI's main goal is on-time deliveries. Option 1's +1.2 improves only 2/5 seeds, so the main-goal gain is not established. Its wait improvements are real in the averages, but I have not checked them per seed. Adopting it would impose a 16-point loss on C, against C's vote, on top of the D1 loss whose promised mitigation has not happened, and road violations would rise again. I recommend keeping v2 for now. Option 1 can be revisited with per-seed wait data, more seeds, and a proposal that offsets C's loss. If the operator values the tail-wait reduction (max_wait_s 201 → 129) enough to justify it, option 1 is a defensible, revertible alternative.",
+      "assumptions": [
+        "The 5 seeds represent next period's demand.",
+        "The improvements in p95_wait_s and max_wait_s are averages and may not hold on every seed.",
+        "C's utility loss reflects a real operational cost to C, not a measurement artifact.",
+        "Keeping v2 changes nothing in the measured metrics."
+      ],
+      "predictions": [
+        {
+          "subject": "metric:on_time_deliveries",
+          "expected": "unchanged",
+          "note": "Stays at about 223.8 under v2."
+        },
+        {
+          "subject": "metric:max_wait_s",
+          "expected": "unchanged",
+          "note": "Stays at about 201; the improvement to 129 is forgone."
+        },
+        {
+          "subject": "metric:blocked_s",
+          "expected": "unchanged",
+          "note": "Stays at about 936."
+        },
+        {
+          "subject": "metric:unfinished",
+          "expected": "unchanged",
+          "note": "Stays at 0.0."
+        }
+      ]
+    },
+    "unknowns": [
+      "Whether p95_wait_s and max_wait_s improve on each seed under option 1, or only on average.",
+      "Why C loses so much under faster eviction (route patterns, holding behaviour) and whether C would change its policy in response.",
+      "Whether a mitigation for C, promised after D1, is feasible and acceptable to C.",
+      "The cause and safety relevance of the further rise in road violations (28.0 → 29.8).",
+      "How customers perceive shorter tail waits compared with the current service level.",
+      "Next period's demand, and whether the effect of block_k changes under higher load.",
+      "Whether more seeds would make the main-goal effect clearer."
+    ]
+  }
+}

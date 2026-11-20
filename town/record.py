@@ -73,14 +73,16 @@ class Gsn:
 
 
 def attach_answer(gsn: Gsn, parent: str, answer: dict) -> None:
-    """人間の回答（自然言語の reason と、GSN の要素 gsn:）を parent の下につなぐ。"""
+    """判断した者の回答（自然言語の reason と、GSN の要素 gsn:）を parent の下につなぐ。
+    人間に代わって LLM が答えたとき（by: llm-decider）は、要素の by を llm にする。"""
+    by = "llm" if answer.get("by") == "llm-decider" else "human"
     if answer.get("reason"):
-        gsn.add("justification", answer["reason"], parent, by="human")
+        gsn.add("justification", answer["reason"], parent, by=by)
     for a in answer.get("assumptions") or []:
-        gsn.add("assumption", a, parent, by="human")
+        gsn.add("assumption", a, parent, by=by)
     for item in answer.get("gsn") or []:
         kind = item.get("type")
         if kind not in KINDS:
             raise SystemExit(f"[ERROR] GSN の要素の種類 {kind!r} が分かりません"
                              f"（使えるのは {', '.join(KINDS)}）。")
-        gsn.add(kind, item["text"], parent, by="human")
+        gsn.add(kind, item["text"], parent, by=by)

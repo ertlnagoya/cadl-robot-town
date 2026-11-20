@@ -1,0 +1,100 @@
+{
+  "note": "claude-opus-5-5、入力 4908 / 出力 3752 トークン",
+  "request_digest": "4cbf31d367e8117e",
+  "data": {
+    "question": "Should the road hold_limit stay at 60s, be raised to 70s as the measured mitigation for C, or be lowered to 50s to cut blocking and customer waits?",
+    "background": "Option 2 (70s) is the C mitigation promised in D1 and D3. It gains only +0.6 on-time, with 2/5 seeds improved, so it will probably not pass the +1.0 objective gate. Whether to accept a flat or slightly better on-time count in exchange for fairness to C is a value judgement that the KPI does not settle, because the KPI does not name company fairness. Option 1 (50s) passes the gates and can be adopted automatically, but C votes against it, and that weighs on the operator's repeated commitment to C, so I am setting all three options side by side for you.",
+    "options": [
+      {
+        "id": "2",
+        "summary": "hold_limit 60s → 70s. On-time 272.6 → 273.2 (+0.6, 2/5 seeds improved, so the gain is not established), late 2.0 → 1.4, p95_wait_s 90.0 → 86.8, max_wait_s 212 → 212 (unchanged), unfinished 0.0. Blocked s 1102 → 1078, road violations 29.6 → 28.8, lowest on-time rate 0.98 → 0.99. Utility A/B/C 97.4/76.0/68.8 → 98.0/75.7/69.5. Votes: A yes, B yes, C yes. Passes check and the constitution, but probably not the +1.0 objective gate.",
+        "stakeholders": "C gains a little (+0.7), and this partly honours the D1/D3 promise. A gains slightly (+0.6) and B loses slightly (-0.3). Customers are no worse off on average and get slightly shorter p95 waits, but the worst wait (212s) stays the same. Road violations fall slightly. As a mitigation it is small compared with C's earlier losses (28.8 → 19.0 in D1)."
+      },
+      {
+        "id": "1",
+        "summary": "hold_limit 60s → 50s. On-time 272.6 → 273.6 (+1.0, 4/5 seeds improved), late 2.0 → 1.0, p95_wait_s 90.0 → 83.0, max_wait_s 212 → 154, unfinished 0.0. Blocked s 1102 → 915, lowest on-time rate 0.98 → 0.99, but road violations rise 29.6 → 32.6. Utility A/B/C 97.4/76.0/68.8 → 98.4/77.2/66.3. Votes: A yes, B yes, C no. Passes all gates and can be adopted automatically.",
+        "stakeholders": "Customers gain the most: more on-time deliveries, half the late deliveries, and a much shorter worst wait (212s → 154s). A (+1.0) and B (+1.2) gain. C loses 2.5 and votes no, which again delays the mitigation promised to C. Road violations rise by 3.0, and the cause of earlier rises is still unexamined."
+      },
+      {
+        "id": "keep",
+        "summary": "No change (stay at v2). On-time 272.6, late 2.0, p95_wait_s 90.0, max_wait_s 212, unfinished 0.0, blocked s 1102, road violations 29.6. Utility A/B/C 97.4/76.0/68.8.",
+        "stakeholders": "No one gains or loses relative to now. Customers miss the shorter waits measured for option 1. C gets no mitigation, which would be the third period in which the D1 promise is not met."
+      }
+    ],
+    "recommendation": {
+      "id": "1",
+      "reason": "The KPI is town-wide on-time delivery with customer waits as watched goals (K1). Option 1 beats both other options on every KPI metric. On-time gains +1.0 on 4/5 seeds, which is the kind of consistent evidence D2 lacked. Late is halved, p95_wait_s falls to 83.0, and max_wait_s falls from 212 to 154. Blocked time also drops from 1102 to 915. C's cost is small (-2.5), unlike the losses in D1 and D2, and A and B support the change. Option 2 is unanimous and does no harm, but its on-time gain is not established (2/5 seeds). It also gives C only +0.7, so it does not really meet the promise to C. A meaningful mitigation for C should be designed and measured separately, for example as compensation or a change aimed at C's bottleneck, rather than bought with customers' tail waits. The rise in road violations (29.6 → 32.6) is the main risk. This is a rule-level change that can be reverted, so it should be adopted together with an examination of why violations rise when blocking is shortened. If you weigh the repeated delay to C's mitigation more heavily than the KPI gain, option 2 is the acceptable fallback, because it does not harm customers.",
+      "assumptions": [
+        "The 5-seed same-seed measurement represents next period's demand and company behaviour.",
+        "The rise in road violations from 29.6 to 32.6 has no safety consequences beyond what the constitution already allows.",
+        "C's utility loss of 2.5 does not change C's behaviour in ways the simulation does not capture.",
+        "A majority vote of A and B is enough for adoption under the current quorum."
+      ],
+      "predictions": [
+        {
+          "subject": "metric:on_time_deliveries",
+          "expected": "increase",
+          "note": "Measured 272.6 → 273.6, with 4/5 seeds improved."
+        },
+        {
+          "subject": "metric:late_deliveries",
+          "expected": "decrease",
+          "note": "Measured 2.0 → 1.0."
+        },
+        {
+          "subject": "metric:p95_wait_s",
+          "expected": "decrease",
+          "note": "Measured 90.0 → 83.0."
+        },
+        {
+          "subject": "metric:max_wait_s",
+          "expected": "decrease",
+          "note": "Measured 212 → 154."
+        },
+        {
+          "subject": "metric:unfinished",
+          "expected": "unchanged",
+          "note": "Stays at 0.0."
+        },
+        {
+          "subject": "metric:blocked_s",
+          "expected": "decrease",
+          "note": "Measured 1102 → 915."
+        },
+        {
+          "subject": "metric:road_violations",
+          "expected": "increase",
+          "note": "Measured 29.6 → 32.6. This is the main risk to monitor."
+        },
+        {
+          "subject": "metric:utility@C",
+          "expected": "decrease",
+          "note": "Measured 68.8 → 66.3."
+        },
+        {
+          "subject": "vote:A",
+          "expected": "yes",
+          "note": "A's utility rises from 97.4 to 98.4."
+        },
+        {
+          "subject": "vote:B",
+          "expected": "yes",
+          "note": "B's utility rises from 76.0 to 77.2."
+        },
+        {
+          "subject": "vote:C",
+          "expected": "no",
+          "note": "C's utility falls from 68.8 to 66.3."
+        }
+      ]
+    },
+    "unknowns": [
+      "Why road violations rise when the hold limit is shortened, and whether the additional violations matter for safety.",
+      "Per-seed values of p95_wait_s and max_wait_s; only averages are shown.",
+      "How C will respond to another vote it loses, for example in its routing or cooperation, and how much trust in the operator's D1 promise is at stake.",
+      "Whether a targeted mitigation for C exists, such as compensation or a change aimed at C's bottleneck, and what it would cost customers; none has been measured yet.",
+      "Whether intermediate values (for example 55s) would keep most of option 1's customer gain at less cost to C or less violation increase.",
+      "How customers perceive the change in worst-case waits, and next period's demand level."
+    ]
+  }
+}

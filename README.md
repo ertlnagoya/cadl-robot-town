@@ -45,7 +45,7 @@ There are two amendment loops.
 Assumes Course A's setup: the CADL compiler cloned to `~/program/cadl_repo`, as in
 [Section 2.4 of the Textbook](https://www.ertl.jp/cadl-spec/docs/textbook/toolchain-setup/#24-setup-5-min),
 which also lists fixes for install problems. Use cadl 0.3.32 or later (checked
-with 0.3.36; see `cadl --version`): an older compiler leaves the safety invariant of a
+with 0.3.37; see `cadl --version`; the decision records need 0.3.37): an older compiler leaves the safety invariant of a
 regime transition out of the IR, and the town refuses the rules. A rule file with
 `sos.regimes` (per-regime bindings, cadl 0.3.32) is refused too, since the town does
 not apply those bindings yet.
@@ -243,6 +243,33 @@ records do. On replay, the request is rebuilt from the current rules,
 constitution, amendment history and prompt and compared with the record; if they
 differ, the replay prints a note. The hand-written sample holds the digest of the
 current request.
+
+### Decision records (decisions.jsonl)
+
+`town.steward` and `town.council` write `runs/<name>/decisions.jsonl` in each run, in the
+format of [Appendix L](https://www.ertl.jp/cadl-spec/docs/spec/appendix-l-decisions) of the
+CADL specification: who proposed what, what was measured, how each company voted, who
+recommended what, and who decided with which reason, one entry per line, with the hash
+chain of G.8.
+
+```bash
+cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.37 or later
+```
+
+- A proposal, a recommendation and a decision carry the same evidence (reason, assumptions,
+  unknowns, predictions) whether a person, the LLM or a tool made them. `town.steward` stops
+  when a human answer in `answers.yaml` has no reason. An answer may also give `unknowns`,
+  `follow_ups` (`text` and the period `due`) and `fulfils` (ids of earlier follow-ups, such
+  as `D1.f1`).
+- With `--decider llm`, the LLM answers the decision requests in place of the human
+  (`llm/p<k>-decide.json`). In the record it is a party acting on behalf of the operator
+  (`on_behalf_of: operator`), and the verifier reports the finding delegated, for the rules
+  and the contract alike.
+- `--layers rule,contract` keeps the proposals to the rule and contract layers (regulation
+  proposals are left out unmeasured).
+- Samples: `examples/steward-contract/` (Japanese) and `examples/steward-contract-en/`
+  (English) are six periods under a KPI that allows the promised times to be revised, decided
+  by the LLM in place of the human.
 
 ## License
 
