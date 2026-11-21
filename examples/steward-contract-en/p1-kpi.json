@@ -1,76 +1,57 @@
 {
-  "note": "claude-opus-5-5、入力 3083 / 出力 1885 トークン",
+  "note": "claude-opus-5-5、入力 3083 / 出力 1607 トークン",
   "request_digest": "4851e7945fbf9b46",
   "data": {
-    "interpretation": "The main goal is the town-wide count of orders delivered within the promised pickup and delivery times, so on_time_deliveries is the primary metric. The KPI also allows the promised times in DELIVERY_SLA to be revised. Those are contract changes, so a human must decide them. Changing the promise also changes what counts as 'on time', so loosening it can raise on_time_deliveries without customers being served any faster. Customer impact therefore has to be measured with metrics that do not depend on the promise: wait time from order to delivery (p95_wait_s, max_wait_s) and orders left undelivered (unfinished). The KPI states no numeric levels, so no targets or guard values are set.",
+    "interpretation": "The KPI asks to maximize the number of orders delivered town-wide within the promised pickup and delivery times. It explicitly allows revising those promised times (a DELIVERY_SLA contract change, which a human must decide). Any change that is worse for customers must be justified by its measured effect on them. On-time count is the main measure, but it depends on the promise itself, so customer impact has to be tracked with measures that do not depend on the promise: actual wait times and orders left undelivered. The KPI states no numeric levels, so no targets or guard values are set.",
     "options": [
       {
-        "label": "On-time count as primary, with promise-independent customer metrics monitored",
+        "label": "Maximize town-wide on-time deliveries, monitoring customer wait",
         "goals": [
           {
             "metric": "on_time_deliveries",
-            "text": "Maximize the number of orders delivered within the promised times across the town."
+            "text": "Number of orders delivered within the promised times across the town (higher is better)"
           },
           {
             "metric": "p95_wait_s",
-            "text": "Monitor the 95th-percentile order-to-delivery wait so that promise revisions do not hide slower service."
+            "text": "Customers' 95th-percentile wait from order to delivery, which does not depend on the promise; monitored so that SLA loosening that worsens real service is visible"
+          },
+          {
+            "metric": "unfinished",
+            "text": "Orders still undelivered at the end of the period; monitored as the clearest customer harm"
           },
           {
             "metric": "max_wait_s",
-            "text": "Monitor the longest order-to-delivery wait, to measure the worst customer outcome."
-          },
-          {
-            "metric": "unfinished",
-            "text": "Monitor orders still undelivered at the end of the period."
+            "text": "Longest single customer wait; monitored for worst-case customer impact"
           }
         ],
         "guards": [],
-        "note": "Improvement is measured by on_time_deliveries. Any DELIVERY_SLA revision goes to a human, together with the measured change in p95_wait_s, max_wait_s and unfinished on the same seeds. This gives the reason the KPI requires before accepting a change that is worse for customers."
+        "note": "Literal reading of the KPI. Every SLA revision still goes to a human, who reviews the monitored wait-time and unfinished values before accepting it. No guard values are set because the KPI gives no levels."
       },
       {
-        "label": "Literal reading: on-time count with late and unfinished orders monitored",
-        "goals": [
-          {
-            "metric": "on_time_deliveries",
-            "text": "Maximize the number of orders delivered within the promised times across the town."
-          },
-          {
-            "metric": "late_deliveries",
-            "text": "Monitor orders delivered after the promised time."
-          },
-          {
-            "metric": "unfinished",
-            "text": "Monitor orders still undelivered at the end of the period."
-          }
-        ],
-        "guards": [],
-        "note": "Simplest reading. However, late_deliveries and on_time_deliveries both depend on the promised times. A looser promise would look like an improvement on every goal here even if customers wait longer."
-      },
-      {
-        "label": "Actual customer wait as primary, on-time count monitored",
+        "label": "Improve customers' actual wait time, monitoring on-time deliveries",
         "goals": [
           {
             "metric": "p95_wait_s",
-            "text": "Reduce the 95th-percentile order-to-delivery wait, which does not depend on the promised times."
+            "text": "Customers' 95th-percentile wait from order to delivery (lower is better); cannot be improved by loosening promises"
           },
           {
             "metric": "on_time_deliveries",
-            "text": "Monitor the number of orders delivered within the promised times."
+            "text": "Orders delivered within the promised times; monitored so the promises are not neglected"
           },
           {
             "metric": "unfinished",
-            "text": "Monitor orders still undelivered at the end of the period."
+            "text": "Orders undelivered at period end; monitored"
           }
         ],
         "guards": [],
-        "note": "Keeps the primary metric comparable across promise revisions. It departs from the KPI's stated objective (count of on-time orders), so it fits only if customer experience matters more than the promise count."
+        "note": "Uses a promise-independent measure as the primary goal, so a contract change cannot count as improvement just by relaxing deadlines. This drifts from the KPI's literal wording, which counts on-time deliveries."
       }
     ],
     "recommended": 1,
     "concerns": [
-      "on_time_deliveries is defined relative to DELIVERY_SLA. Revising the promised times changes what counts as on time, so the count could rise from looser promises rather than faster service. Wait-time metrics are needed to measure the real effect on customers.",
-      "The KPI gives no numeric levels (no target count, rate, or maximum acceptable wait), so no targets or guard values have been set. If a floor on customer wait is intended, please state it.",
-      "The KPI is town-wide. Maximizing the total could let one company's on-time rate fall. Company-level metrics (min_company_on_time_rate, on_time_rate_gap) are not included because the KPI does not mention them."
+      "Proxy risk: on_time_deliveries is measured against the promised times. If those times are loosened, the count can rise while customers actually wait longer. Wait-time and unfinished metrics are monitored to expose this, but the human must weigh them when judging any SLA revision.",
+      "The KPI requires a reason, based on measured effect, for any customer-worsening change, but it sets no level of acceptable worsening. No guard thresholds are set. If the human wants a hard limit (e.g., a maximum p95 wait), it must be stated.",
+      "Under the same random seed the number of orders is fixed, so on_time_deliveries and on_time_rate rank changes identically. The count was chosen to match 'as many orders as possible'."
     ],
     "revisit": []
   }

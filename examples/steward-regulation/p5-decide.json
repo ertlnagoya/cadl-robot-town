@@ -1,0 +1,125 @@
+{
+  "note": "claude-opus-5-5、入力 12839 / 出力 3017 トークン",
+  "request_digest": "7b4b7431d119c12d",
+  "data": {
+    "choice": "2",
+    "reason": "推奨と同じく、案 2（sanction_lambda 0.5 → 1）を選びます。投票の結果（A ○ B ○ C ×、定足数 2 で可決）とも一致します。\n\n案 2 を選ぶ理由：主目標 on_time_deliveries は 74.8 から 82.6（差 +7.8、改善したシード 5/5）になり、遅配は 7.8 から 0.0、ふさがれた秒は 2396 から 400 に減ります。最低の定時率は 0.83 から 1.00、worst_company_p95_wait_s は 390 から 79.4 になり、unfinished は 0.0 のままです。road_violations も 20.6 から 18.2 に減ります。KPI で監視する目標のどれも悪化しません。D3・D4 の方針は、違反の内訳を確かめるまで違反が増える案を採択しないというものです。案 2 は違反を減らすため、この方針に反しません。検査と憲法を通っており、規制を変える必要もありません。\n\n案 1 を選ばない理由：主目標の差は +6.0 で案 2 より小さく、road_violations は 20.6 から 26.0 に増えます。違反の増加は 5 期続けて同じ傾向ですが、内訳と安全への影響はまだ測っていません。D3・D4 の方針を変える理由はありません。案 1 の投票は表では A ○ B ○ C × で、可決の条件を満たします。判断を求める理由にある「否決された場合」という記述は条件として書かれたもので、表の投票とは食い違いません。案 1 を採らないのは投票による否決のためではなく、違反の増加と、より良い案 2 があるためです。\n\nkeep を選ばない理由：顧客、特に最低の定時率 0.83 の会社の顧客に不利益が残ります。それを避ける、違反の増えない案があるためです。\n\n顧客への影響：契約は変えません。どの会社の顧客も定時率 1.00 となり、待ち時間が短くなります。\n\n各社の利害：A 社は効用 23.0 から 26.0、B 社は 23.6 から 28.0 に上がり、得をします。C 社は 15.9 から 10.0 に下がり、損をします。C 社の顧客の定時率は下がらないと読みますが、会社としての C 社の利害の悪化を記録します。罰点の強化が C 社の運用に偏って効いている可能性があるため、その要因を調べます。\n\nまだ果たされていない約束について：違反の内訳の調査、変種の測定、guards の水準の提案、条件付きの規制案の提示は、どれもこの判断では行っていません。そのため、どの約束も果たしたとは記録しません。D4.f3 の食い違いの原因も確かめていません。",
+    "assumptions": [
+      "表の測った値は、第 5 期の需要と 5 つのシードのもとで、次の期の実際の運用でもおおむね再現される。",
+      "案 2 で減る road_violations の中に、安全上重い種類の違反が新たに増えていない（種類ごとの内訳は測っていない）。",
+      "C 社の効用の低下は罰点の増加によるもので、C 社の顧客の定時率の低下によるものではない。",
+      "C 社は、反対した採択の後も現行の運用を続ける。"
+    ],
+    "unknowns": [
+      "案 2 で road_violations の種類ごとの件数がどう変わるか。",
+      "案 1（block_k=2）で増える違反の内訳と、道路を使う人の安全への影響。",
+      "C 社の効用が 15.9 から 10.0 に下がる具体的な要因と、C 社が今後とる運用。",
+      "閑散期で得た改善が、次の期の需要の量と分布の下でも続くかどうか。",
+      "第 4 期の案 1 の投票で、記述と表が食い違った原因（D4.f3）。",
+      "表の R1（min_company_on_time_rate 0.6 → 0.65）を規制の担当者がいつ判断するか。"
+    ],
+    "predictions": [
+      {
+        "subject": "metric:on_time_deliveries",
+        "expected": "increase",
+        "note": "表では 74.8 から 82.6（+7.8、改善したシード 5/5）。"
+      },
+      {
+        "subject": "metric:late_deliveries",
+        "expected": "decrease",
+        "note": "表では 7.8 から 0.0。"
+      },
+      {
+        "subject": "metric:blocked_s",
+        "expected": "decrease",
+        "note": "表では 2396 から 400。"
+      },
+      {
+        "subject": "metric:road_violations",
+        "expected": "decrease",
+        "note": "表では 20.6 から 18.2。"
+      },
+      {
+        "subject": "metric:min_company_on_time_rate",
+        "expected": "increase",
+        "note": "表では 0.83 から 1.00。"
+      },
+      {
+        "subject": "metric:worst_company_p95_wait_s",
+        "expected": "decrease",
+        "note": "表では 390 から 79.4。"
+      },
+      {
+        "subject": "metric:unfinished",
+        "expected": "unchanged",
+        "note": "0.0 のまま。"
+      },
+      {
+        "subject": "metric:utility@C",
+        "expected": "decrease",
+        "note": "表では 15.9 から 10.0。"
+      },
+      {
+        "subject": "metric:utility@A",
+        "expected": "increase",
+        "note": "表では 23.0 から 26.0。"
+      },
+      {
+        "subject": "metric:utility@B",
+        "expected": "increase",
+        "note": "表では 23.6 から 28.0。"
+      },
+      {
+        "subject": "vote:A",
+        "expected": "yes",
+        "note": "表のとおり賛成。"
+      },
+      {
+        "subject": "vote:B",
+        "expected": "yes",
+        "note": "表のとおり賛成。"
+      },
+      {
+        "subject": "vote:C",
+        "expected": "no",
+        "note": "表のとおり反対。"
+      }
+    ],
+    "follow_ups": [
+      {
+        "text": "採択後の規則を第 5 期と同じ条件（同じ乱数シードと需要）で測り直し、表の案 2 の値が再現されるかを確かめる。",
+        "due_period": 6,
+        "kind": "remeasure",
+        "metrics": [
+          "metric:on_time_deliveries",
+          "metric:min_company_on_time_rate",
+          "metric:worst_company_p95_wait_s",
+          "metric:unfinished",
+          "metric:road_violations",
+          "metric:utility@A",
+          "metric:utility@B",
+          "metric:utility@C"
+        ]
+      },
+      {
+        "text": "案 2 と案 1（block_k=2）について、road_violations の種類ごとの件数（blocking_guard による退去の記録か、止まりすぎか）と、道路を使う人の安全への影響を測って記録する（D4.f2 の持ち越し）。",
+        "due_period": 6,
+        "kind": "action",
+        "metrics": []
+      },
+      {
+        "text": "C 社の効用が 15.9 から 10.0 に下がる要因（罰点の内訳）を調べる。C 社も受け入れられる sanction_lambda の中間値（例：0.75）などの変種を測り、3 社の投票を確かめる。",
+        "due_period": 6,
+        "kind": "action",
+        "metrics": []
+      },
+      {
+        "text": "guards の水準を運営者に提案し、判断を求める（D4.f4 の持ち越し）。案は、最低の定時率 0.93 を下回らないこと、unfinished 0、road_violations を現行より増やさないこととする。",
+        "due_period": 6,
+        "kind": "action",
+        "metrics": []
+      }
+    ],
+    "fulfils": []
+  }
+}

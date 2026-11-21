@@ -28,7 +28,7 @@
 ## セットアップ
 
 コース A のセットアップ（`~/program/cadl_repo` に CADL コンパイラをクローン）が
-済んでいることが前提。CADL コンパイラは 0.3.32 以降を使う（0.3.37 で確かめている。判断の記録の書き出しには 0.3.37 以降が要る）。
+済んでいることが前提。CADL コンパイラは 0.3.32 以降を使う（0.3.38 で確かめている。判断の記録の書き出しには 0.3.38 以降が要る）。
 `cadl --version` で確かめられる。古いコンパイラの IR には切替の安全条件が入らないので、街は規則を却下する。
 手順とインストールの問題への対処は
 [テキストブックの 2.4 節](https://www.ertl.jp/cadl-spec/ja/docs/textbook/toolchain-setup/#24-セットアップ-5-分)にある。
@@ -327,7 +327,7 @@ LLM の呼び出しには、安全分類器に断られたとき推奨のモデ�
 |---|---|---|
 | 規則 | `ROAD_USE`、運用モードの切替 | 判定をすべて通れば自動で採択できる。切替のしきい値（`safety: true`）は人間が決める |
 | 契約 | `DELIVERY_SLA`（集荷と配達の約束の秒数） | 顧客は投票に加わらないので、人間が決める |
-| 規制 | 憲法の不変条件と定足数 | 人間が決める |
+| 規制 | 憲法の不変条件と定足数 | 規制の担当者（運営者とは別の人間）が、別の判断要求 `R<k>` で決める |
 
 次のどれかに当たる案があると、自動では採択せず、LLM が判断要求を書いて人間の答えを待つ（`town/steward.py` の `triage()`）。
 
@@ -448,24 +448,40 @@ python -m town.steward --lang en --mode DISTRIBUTED --rounds 6 --name kpi-d-en \
 ### 判断の記録（decisions.jsonl）
 
 `town.steward` と `town.council` は、実行ごとに `runs/<名前>/decisions.jsonl` を書き出す。
-CADL 仕様の[付録 L](https://www.ertl.jp/cadl-spec/ja/docs/spec/appendix-l-decisions)の形式で、
+CADL 仕様の[付録 L](https://www.ertl.jp/cadl-spec/ja/docs/spec/appendix-l-decisions)の形式（decisions 0.2）で、
 誰が何を提案し、何を測り、各社がどう投票し、誰が何を推奨し、誰がどの理由で判断したかを、
 1 行に 1 項目ずつ残す。各行には、付録 G の G.8 と同じハッシュの連鎖が付く。
 
 ```bash
-cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.37 以降
+cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.38 以降
 ```
 
 - 人間でも LLM でもツールでも、提案・推奨・判断には同じ証拠（理由、前提、分からないこと、予測）を
   残す。人間の答え（`answers.yaml`）に理由がないと、`town.steward` は止まる。答えには
-  `unknowns`（分からないこと）、`follow_ups`（後で確かめること。`text` と期限の期 `due`）、
-  `fulfils`（前に約束したことを果たした項目の id。例 `D1.f1`）も書ける。
-- `--decider llm` では、判断要求に人間に代わって LLM が答える（`llm/p<k>-decide.json`）。
-  記録では、LLM は運営者に代わって判断する当事者（`on_behalf_of: operator`）になり、検証器は
-  指摘 delegated を出す。規則の層でも契約の層でも同じ。
+  `unknowns`（分からないこと）、`follow_ups`（後で確かめること）、`fulfils`（前に約束したことを
+  果たした項目の id。例 `D1.f1`）も書ける。
+- 誰が何を判断するか：運営者は規則と契約（と KPI の読み方）について、運営者とは別の人間である規制の
+  担当者は規制（憲法の `regulation:` に挙がった値）について判断する。規制の案は、同じ期の規則と
+  契約の判断の後に、別の判断要求（`R<k>`、`p<k>-reg-request.md`。答えは `answers.yaml` の `R<k>`）で
+  規制の担当者に出す。規制の変更は次の期から効く（`constitution-v<n>.yaml`）。記録では、判断する
+  当事者が判断してよい層（`layers`）を持つ。規則の変更しか自分で採択しない steward は `["rule"]`。
+- 約束は、何がそれを果たすかを持つ。答えの `follow_ups` の項目は、`text`、`due`（期）と、測り直す
+  約束なら `remeasure: true` と `metrics`（例 `utility@C`、`road_violations`）を持つ。steward は、
+  次の期の初めに、判断した期と同じ条件（同じ乱数シードと需要）で測り直し、`F<k>.<約束の id>` として
+  記録する。この測定が約束を果たす。ほかの約束は、後の判断が `fulfils` でそれを挙げれば果たされる。
+  測り直す約束を判断が `fulfils` で挙げても約束は果たされず、検証器は fulfilment not shown を報告する。
+- `--decider llm` では、`--delegate` で与えた層（既定は `rule,contract`。`rule` と `contract` は同じ
+  判断要求で扱うので、両方を任せるか、どちらも任せない）について、人間に代わって LLM が判断要求に
+  答える。運営者に代わるときは `llm-decider`（`llm/p<k>-decide.json`、`llm/p<k>-kpi-decide.json`）、
+  規制の担当者に代わるときは `llm-regulator`（`llm/p<k>-reg-decide.json`）として記録される。任せない
+  層の判断要求は人間に出す。LLM は、まだ果たされていない約束を読み、判断が果たす約束を `fulfils` に
+  挙げ、自分の約束を測り直し（`remeasure`）か行動（`action`）に分ける。検証器は、LLM の判断ごとに
+  指摘 delegated を出す。
 - `--layers rule,contract` で、改正案を規則と契約の層に限る（規制の案は測らずに除く）。
-- 見本：`examples/steward-contract/`（日本語）と `examples/steward-contract-en/`（英語）は、
-  契約（約束の時間）の見直しを許す KPI で、LLM が人間に代わって判断した 6 期の記録。
+- 見本（Claude Opus 5.5 が人間に代わって判断した、2026-11-21 の記録）：`examples/steward-contract/`
+  （日本語）と `examples/steward-contract-en/`（英語）は、契約（約束の時間）の見直しを許す KPI での
+  6 期（`--layers rule,contract`）。`examples/steward-regulation/` と `examples/steward-regulation-en/`
+  は、規制の見直しを許す KPI での 6 期（`--delegate rule,contract,regulation`）。
 
 ## 制約と、まだないもの
 
