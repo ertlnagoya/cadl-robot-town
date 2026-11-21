@@ -1,78 +1,74 @@
 {
-  "note": "claude-opus-5-5、入力 3110 / 出力 2168 トークン",
+  "note": "claude-opus-5-5、入力 3110 / 出力 2060 トークン",
   "request_digest": "f806fd98ad763fb8",
   "data": {
-    "interpretation": "The main aim is to maximize the number of orders delivered within the promised times across the whole town, measured as on_time_deliveries (or on_time_rate for the same orders). 'Leave no company's customers behind' adds a fairness requirement: the worst-served company must not fall behind, which is best measured by min_company_on_time_rate. The KPI gives no numeric level for either aim, so no targets or guard values are set. The sentence about revising the regulation is a process instruction, not a metric. Proposals that change the constitution's invariants or quorum must go to the human with an impact statement covering companies A, B, C and the customers.",
+    "interpretation": "The KPI has one main aim: maximize the number of orders delivered within the promised customer times, measured town-wide. Under the same seed the order count is fixed, so on_time_deliveries and on_time_rate rank amendments identically. It adds a fairness condition: no company's customers may be left behind. The KPI sets no numeric level for either aim, so no targets or guard values are set. The clause about proposing regulation revisions (invariants, quorum) when votes or the constitution block customer-friendly amendments is a process permission, not a metric. Any such proposal goes to the human and must state its effect on companies A, B, C and on customers.",
     "options": [
       {
-        "label": "Town-wide on-time count first, with the worst company watched for regression",
+        "label": "Town-wide on-time count first, weakest company monitored",
         "goals": [
           {
             "metric": "on_time_deliveries",
-            "text": "Maximize the number of orders delivered within the promised time across the town."
+            "text": "Maximize town-wide deliveries made within the promised time (primary)."
           },
           {
             "metric": "min_company_on_time_rate",
-            "text": "Watch that the lowest company's on-time rate does not drop, so no company's customers are left behind."
+            "text": "Monitor the on-time rate of the worst-off company so no company's customers fall behind."
           },
           {
             "metric": "unfinished",
-            "text": "Watch that orders are not left undelivered at period end to raise the on-time count."
-          },
-          {
-            "metric": "late_deliveries",
-            "text": "Watch that late deliveries do not increase."
+            "text": "Monitor orders left undelivered at period end, so late orders are not simply abandoned."
           }
         ],
         "guards": [],
-        "note": "This is the most direct reading of 'as many orders as possible within the promised times'. Fairness is protected only as 'no worsening' of the worst company, because the KPI gives no minimum level. Any amendment that touches DELIVERY_SLA or the constitution still needs a human decision."
+        "note": "Follows the KPI's word order: volume first, fairness as a watched secondary. Uses the weakest company's rate rather than the gap, because the gap can be 'improved' by dragging the best company down. No levels are given, so no targets or guards are set."
       },
       {
-        "label": "Lift the worst-served company first (max-min), with the town-wide total watched",
+        "label": "Weakest company first, town-wide count monitored",
         "goals": [
           {
             "metric": "min_company_on_time_rate",
-            "text": "Maximize the on-time rate of the company whose customers are served worst."
+            "text": "Raise the on-time rate of the worst-off company (primary)."
           },
           {
             "metric": "on_time_deliveries",
-            "text": "Watch that the town-wide on-time delivery count does not drop."
+            "text": "Monitor town-wide on-time deliveries so fairness gains do not cost overall volume."
           },
           {
             "metric": "unfinished",
-            "text": "Watch that undelivered orders at period end do not increase."
+            "text": "Monitor orders left undelivered at period end."
           }
         ],
         "guards": [],
-        "note": "Choose this if 'leave no company's customers behind' is the main aim. Amendments that help the weakest company are preferred even when the town-wide gain is smaller."
+        "note": "Reads 'leave no company's customers behind' as the binding priority. It may reject amendments that add many on-time deliveries but help only the stronger companies."
       },
       {
-        "label": "Town-wide on-time count first, with the gap between companies watched",
+        "label": "Town-wide on-time count first, company gap monitored",
         "goals": [
           {
             "metric": "on_time_deliveries",
-            "text": "Maximize the number of orders delivered within the promised time across the town."
+            "text": "Maximize town-wide deliveries made within the promised time (primary)."
           },
           {
             "metric": "on_time_rate_gap",
-            "text": "Watch that the gap in on-time rate between the best and worst company does not widen."
+            "text": "Monitor the spread between the best and worst company on-time rates."
           },
           {
-            "metric": "min_company_on_time_rate",
-            "text": "Watch that the lowest company's on-time rate does not drop."
+            "metric": "late_deliveries",
+            "text": "Monitor late deliveries so orders that miss the promise are still delivered rather than dropped."
           }
         ],
         "guards": [],
-        "note": "This reads 'leave no company behind' as keeping companies close to each other. The gap metric alone could be met by making the best company worse, so the worst-company rate is also watched."
+        "note": "Reads fairness as equality between companies. The gap can shrink when the best company gets worse, which is why option 1 is preferred."
       }
     ],
     "recommended": 1,
     "concerns": [
-      "The KPI gives no numeric level for the on-time aim or for the fairness floor. Without one, fairness can only be checked as 'no worsening'. If a hard floor is intended (e.g., every company at least X% on time), the human should state X so it can become a guard.",
-      "The town-wide total and the worst-company rate can conflict. An amendment that adds on-time deliveries overall may still lower one company's rate. The human should decide which comes first (option 1 vs option 2).",
-      "on_time_deliveries is a proxy that counts an order the same whether it is a minute late or never delivered. Optimizing it alone could favour abandoning hard orders. unfinished and late_deliveries are therefore watched, and max_wait_s or p95_wait_s could be added if long waits matter.",
-      "The 'promised times' are defined in DELIVERY_SLA. Loosening the SLA would raise on-time metrics without serving customers better. Customers do not vote, so any SLA change must be decided by the human and must not be counted as a KPI gain by itself.",
-      "The KPI invites proposals to revise the regulation (invariants, quorum) when votes block customer-friendly amendments. Such revisions remove protections the companies agreed to. Each proposal must go to the human with a statement of how each of A, B, C and the customers is affected (e.g., which company loses a veto, which road-safety invariant is relaxed). road_violations and sanction_total should be reported alongside, even though the KPI does not mention them."
+      "Volume and fairness can conflict: an amendment may add town-wide on-time deliveries while lowering one company's rate. The KPI does not say which wins, or by how much a company may fall behind. Without a stated level, fairness can only be monitored, not enforced as a guard.",
+      "'Leave no company's customers behind' can be read as protecting the weakest company (min_company_on_time_rate) or as equality (on_time_rate_gap). The gap is a risky proxy because it improves when the best company gets worse.",
+      "Counting only on-time deliveries rewards deprioritizing orders that are already going to be late. Those orders could end up unfinished, which hurts customers. Unfinished or late deliveries should be watched.",
+      "Relaxing the promised times in DELIVERY_SLA would inflate on-time counts without real service gains. Contract changes affect customers, who do not vote, so they must be decided by the human, never adopted to hit this metric.",
+      "Regulation revisions (invariants, quorum) are permitted to propose but are always decided by the human. Each proposal must state how companies A, B, C and customers are affected. In particular, lowering a quorum removes a company's ability to block changes that harm it, which may conflict with the fairness aim."
     ],
     "revisit": []
   }

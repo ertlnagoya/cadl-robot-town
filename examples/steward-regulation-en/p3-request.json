@@ -1,95 +1,95 @@
 {
-  "note": "claude-opus-5-5、入力 4657 / 出力 2710 トークン",
-  "request_digest": "235676c161ad9e58",
+  "note": "claude-opus-5-5、入力 4689 / 出力 2610 トークン",
+  "request_digest": "93eb4fac5e6a575f",
   "data": {
-    "question": "Should option 1 (block_k 3 → 2), which B and C have voted down, be sent to the regulation officer for adoption through the quorum referral (R1: vote.quorum 2 → 1)? Or should the operator adopt option 2 (hold_limit 60s → 50s), which passes by vote, or keep v1?",
-    "background": "Option 1 gives the largest gain for customers, but B and C voted it down again (A ○, B ×, C ×). It can only be adopted by revising the quorum (R1, D1.f3). That is a regulation-layer change that binds all three companies and their customers, so neither I nor the operator can make it alone. The operator (K1, D2) asked that road violations, C's utility loss and sanction_total be stated before any such referral. This period's table gives the first two but still does not report sanction_total, so I cannot settle the trade-off myself.",
+    "question": "Should we adopt rule amendment 1 (sanction_lambda 0.5 → 1), whose average gain is large but which improved only 3 of 5 seeds, or the smaller but steadier amendment 2 (hold_limit 60s → 50s), or keep v1?",
+    "background": "Amendment 1 passes check, the constitution and the vote (A ○, B ○, C ×). Its average change in on_time_deliveries is +7.0, but only 3/5 seeds improve, so the gain may not hold in a given period, and I cannot tell that from the measurements alone. This is a choice between a higher but uncertain expected gain and a smaller but more reliable one (amendment 2: +2.2, 4/5 seeds). Accepting that risk, and the larger loss to C, is a judgement call that should be yours.",
     "options": [
       {
         "id": "1",
-        "summary": "Evict a parked robot when two robots wait behind it. Adoption requires the R1 quorum revision (vote.quorum 2 → 1) by the regulation officer, because B and C voted ×. Measured against current: on-time 213.6 → 219.4 (+5.8, seeds improved 3/5); late 9.2 → 3.4; lowest on-time rate 0.93 → 0.96; unfinished 0.0 → 0.0; blocked s 1888 → 1217. Costs: road violations 24.2 → 34.8; utility B 69.6 → 62.5; utility C 58.3 → 46.9. The improvement now holds on only 3 of 5 seeds, against 5/5 in earlier periods. sanction_total is not in the table.",
-        "stakeholders": "Customers gain the most: more on-time deliveries, far fewer late ones and a higher floor for the worst-served company's customers. A gains (utility 70.2 → 75.6). B and C lose utility; C loses about a fifth (58.3 → 46.9) and is already the lowest. Lowering the quorum to 1 also lets a single company push through future rules against the other two. That is a lasting governance risk for all three companies and, indirectly, for customers. Road safety and order are worse (road violations +10.6)."
+        "summary": "Raise sanction_lambda 0.5 → 1. On-time 213.6 → 220.6 (+7.0, 3/5 seeds), late 9.2 → 2.2, blocked s 1888 → 1322, road violations 24.2 → 23.4, lowest on-time rate 0.93 → 0.98, unfinished 0.0. Votes A ○, B ○, C ×, so it can pass under the current quorum. In 2 of 5 seeds on-time deliveries did not improve.",
+        "stakeholders": "Customers gain on average: about 7 fewer late deliveries per period, and the weakest company's customers rise to 0.98 on-time. Customers may see no gain, or a small loss, in unlucky periods (2/5 seeds). A gains (utility 70.2 → 73.8) and B gains (69.6 → 73.6). C loses heavily (58.3 → 45.4, −12.9) and voted against. Road users see slightly fewer violations."
       },
       {
         "id": "2",
-        "summary": "Shorten the allowed parking time on the road from 60 s to 50 s. It passes by vote (A ○, B ○, C ×) and can be adopted automatically with no regulation change. Measured against current: on-time 213.6 → 215.8 (+2.2, seeds improved 4/5); late 9.2 → 7.0; lowest on-time rate 0.93 → 0.95; unfinished 0.0 → 0.0. Costs: blocked s 1888 → 2005; road violations 24.2 → 29.0.",
-        "stakeholders": "Customers gain moderately on every KPI measure, including the worst-served company's customers. A gains (70.2 → 73.0) and B gains slightly (69.6 → 70.1). C loses (58.3 → 54.2), but less than under option 1. No precedent is set for overriding votes. Road violations rise less than under option 1."
+        "summary": "Shorten hold_limit 60s → 50s. On-time 213.6 → 215.8 (+2.2, 4/5 seeds), late 9.2 → 7.0, lowest on-time rate 0.93 → 0.95, unfinished 0.0. Blocked s rises 1888 → 2005 and road violations rise 24.2 → 29.0. Votes A ○, B ○, C ×. It can be adopted automatically.",
+        "stakeholders": "Customers gain a small but more reliable improvement: about 2 fewer late deliveries, and the weakest company's customers reach 0.95. A gains (70.2 → 73.0) and B gains slightly (69.6 → 70.1). C loses (58.3 → 54.2, −4.1), less than under option 1. Everyone sharing the road bears about 20% more road violations."
       },
       {
         "id": "keep",
-        "summary": "Stay at v1: on-time 213.6, late 9.2, lowest on-time rate 0.93, unfinished 0.0, blocked s 1888, road violations 24.2. Option 1 could still be referred later, once sanction_total is reported.",
-        "stakeholders": "Customers forgo measured gains: about 2–6 more on-time deliveries and 2–6 fewer late ones per run. C keeps its current utility (58.3); A and B forgo gains. There is no governance risk and no rise in road violations."
+        "summary": "Stay at v1. On-time 213.6, late 9.2, lowest on-time rate 0.93, road violations 24.2.",
+        "stakeholders": "C keeps its current utility (58.3). Customers forgo the measured gains: about 7 more late deliveries per period than under option 1 on average, and the weakest company's customers stay at 0.93. A and B forgo their gains."
       }
     ],
     "recommendation": {
-      "id": "2",
-      "reason": "Option 2 improves all four KPI measures (on-time +2.2 on 4/5 seeds, late 9.2 → 7.0, lowest rate 0.93 → 0.95, unfinished unchanged). It passes by the companies' own vote, so no regulation change is needed. Option 1's gain is larger, but it has weakened to 3/5 seeds. It costs C about a fifth of its utility and adds 10.6 road violations. The quorum change it needs would weaken every company's veto in future votes. sanction_total, which the operator required before the referral, is still missing. I suggest adopting 2 now. The referral of option 1 (R1) should come back with sanction_total measured on top of option 2.",
+      "id": "1",
+      "reason": "Under K1 the main goal is on-time volume. Option 1's average gain (+7.0) is about three times option 2's (+2.2). It also cuts late deliveries from 9.2 to 2.2, raises the weakest company's rate to 0.98, and slightly lowers road violations, whereas option 2 raises them to 29.0. Its seed results are less consistent, but its expected value for customers is clearly higher, and it passes the vote. C's utility loss (−12.9) is a real cost. It should be watched next period, and the change revisited if C's on-time rate or service falls.",
       "assumptions": [
-        "The measured effects of option 2 will hold in the live system much as they did across the 5 seeds.",
-        "C's no vote on option 2 does not mean C will change its behaviour in ways that offset the gain.",
-        "After option 2, block_k 3 → 2 can still be measured and referred in a later period."
+        "The 5 seeds represent next period's demand well enough for the average to be meaningful.",
+        "The 2 non-improving seeds show small losses, not large ones (per-seed values were not given).",
+        "The votes recorded in the table are what each company will cast at adoption.",
+        "C's utility drop does not lead C to change its behaviour in ways that reduce its customers' service."
       ],
       "predictions": [
         {
           "subject": "metric:on_time_deliveries",
           "expected": "increase",
-          "note": "Measured 213.6 → 215.8."
+          "note": "Expected about +7.0 on average. It may not improve in some periods (3/5 seeds improved)."
         },
         {
           "subject": "metric:late_deliveries",
           "expected": "decrease",
-          "note": "Measured 9.2 → 7.0."
+          "note": "Measured 9.2 → 2.2."
         },
         {
           "subject": "metric:min_company_on_time_rate",
           "expected": "increase",
-          "note": "Measured 0.93 → 0.95."
+          "note": "Measured 0.93 → 0.98."
         },
         {
           "subject": "metric:unfinished",
           "expected": "unchanged",
-          "note": "Stays at 0.0."
-        },
-        {
-          "subject": "metric:road_violations",
-          "expected": "increase",
-          "note": "Measured 24.2 → 29.0."
+          "note": "0.0 in both cases."
         },
         {
           "subject": "metric:blocked_s",
-          "expected": "increase",
-          "note": "Measured 1888 → 2005."
+          "expected": "decrease",
+          "note": "Measured 1888 → 1322."
+        },
+        {
+          "subject": "metric:road_violations",
+          "expected": "decrease",
+          "note": "Slight decrease, 24.2 → 23.4."
         },
         {
           "subject": "metric:utility@C",
           "expected": "decrease",
-          "note": "Measured 58.3 → 54.2."
+          "note": "Measured 58.3 → 45.4."
         },
         {
           "subject": "vote:A",
           "expected": "yes",
-          "note": "Voted ○."
+          "note": "Recorded ○."
         },
         {
           "subject": "vote:B",
           "expected": "yes",
-          "note": "Voted ○."
+          "note": "Recorded ○."
         },
         {
           "subject": "vote:C",
           "expected": "no",
-          "note": "Voted ×."
+          "note": "Recorded ×."
         }
       ]
     },
     "unknowns": [
-      "sanction_total for options 1 and 2 and for current. The operator required it, but it is not in this table.",
-      "Why B and C reject block_k 3 → 2, and whether any compensated variant could pass by vote.",
-      "Why the improvement from option 1 fell from 5/5 seeds in earlier periods to 3/5 now.",
-      "How the companies would change their behaviour after a quorum change to 1, including future proposals pushed by a single company.",
-      "How customers view more road violations, and whether those violations cause real disruption or harm.",
-      "Combined effect of options 1 and 2 together, which was not measured.",
-      "Next period's demand and whether the gains hold under different load."
+      "Per-seed results for option 1: how large the losses were in the 2 seeds that did not improve.",
+      "Whether more seeds would confirm or shrink the +7.0 average.",
+      "How C will respond to a 12.9 utility loss, for example by changing its routing or operating policy.",
+      "Next period's demand level and pattern, and whether the sanction effect holds under it.",
+      "How customers of each company perceive the variability from period to period.",
+      "Whether combining options 1 and 2 would do better; this was not measured."
     ]
   }
 }
