@@ -267,8 +267,9 @@ DECIDE_SCHEMA = {
                          "description": "remeasure: measure the rules in force again under the "
                                         "conditions of this period (the same seeds and demand); "
                                         "the steward does it in the next period. propose: an "
-                                        "amendment to measure; the LLM that proposes amendments "
-                                        "reads it in a later period, and a proposal fulfils it. "
+                                        "amendment to measure (one parameter, one step of the "
+                                        "constitution); the LLM that proposes amendments reads "
+                                        "it in a later period, and a proposal fulfils it. "
                                         "ask: a question that a later decision settles."},
                 "metrics": {"type": "array", "items": {"type": "string"},
                             "description": "For remeasure: the values to measure again, as "
@@ -303,7 +304,9 @@ DECIDE_SYSTEM = ROLES + """
   - remeasure：この期と同じ条件（同じ乱数シードと需要）で、いまの規則を測り直す。次の期に
     steward が測り直し、metrics に挙げた値がそろえば果たされます。
   - propose：改正案を測る。改正案を出す LLM が後の期にこれを読み、その案が果たします。
-    text には、どのパラメータをどう動かす案かを書きます。
+    改正案は、1 回に 1 つのパラメータを、憲法の刻みで 1 ステップだけ動かします。いくつかの
+    パラメータを組み合わせた案や、刻みの間の値の案は出せないので、約束しません。text には、
+    どのパラメータをどの値に動かす案かを書きます。
   - ask：後の判断で決める問い。後の判断が fulfils に挙げると果たされます。
   街の中で誰も行わない調べもの（違反を種類ごとに数える、各社に聞く、など）は約束しません。
   まだ果たされていない約束を、言い換えて出し直してはいけません。約束は id のまま残ります。
