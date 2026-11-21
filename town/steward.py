@@ -54,12 +54,14 @@ from .llm_council import MODE_NOTE, MODEL, _observation
 from .period import (CONSTITUTION, DEFAULT_RULES, ROOT, SCENARIO, CompileError, compile_rules,
                      evaluate)
 from .messages import Messages
+from .model import versioned
 from .record import Gsn, attach_answer
 
 KPI_FILE = {"ja": ROOT / "kpi.md", "en": ROOT / "kpi.en.md"}
 M = Messages("ja")                    # main() で --lang に合わせて差し替える
 SEED_SHARE = 0.8
 KEEP = "keep"
+FU_KINDS = ("remeasure", "propose", "ask")   # 約束の種類（何が果たすか）
 
 
 @dataclass
@@ -85,11 +87,13 @@ class Cand:
     worse: list = field(default_factory=list)
     kpi_why: str = ""
     effect: str = ""                  # regulation：この規制が何を変えるか
+    effects: dict = field(default_factory=dict)  # regulation：その期の測定に当てはめた件数
     reasons: list = field(default_factory=list)
     # 証拠のフィールド（付録 L）：LLM が書いた前提、分からないこと、予測
     assumptions: list = field(default_factory=list)
     unknowns: list = field(default_factory=list)
     predictions: list = field(default_factory=list)
+    fulfils: list = field(default_factory=list)   # この案が果たす、案を出す約束の id
 
     def passed(self, *names: str) -> bool:
         return all(self.gates.get(n) for n in names)
@@ -169,6 +173,15 @@ def measure_regulation(c: Cand, const: dict, cur: dict, others: list[Cand]) -> N
         flips = [o.cid for o in others if o.m and
                  (sum(o.votes.values()) >= new["vote"]["quorum"]) != o.gates["vote"]]
         c.effect = M("reg_same") if not flips else M("reg_flip", ids=", ".join(flips))
+    # 規制の案の測定（付録 L）：規制は街の動きを変えず、どの案を採れるかを変える。そこで、
+    # 新しい値を、その期に測った現行の規則と案、その投票に当てはめて数える（新しい実行はしない）
+    measured = [o for o in others if o.m]
+    for tag, cst in (("", new), ("_current", const)):
+        c.effects["in_force_meets_invariants" + tag] = int(invariants_ok(cur, cst["invariants"])[0])
+        c.effects["proposals_meeting_invariants" + tag] = sum(
+            invariants_ok(o.m, cst["invariants"])[0] for o in measured)
+        c.effects["proposals_passing_vote" + tag] = sum(
+            sum(o.votes.values()) >= cst["vote"]["quorum"] for o in measured)
 
 
 def triage(cands: list[Cand], spec: dict) -> tuple[Cand | None, list[Cand]]:
@@ -386,7 +399,11 @@ def main() -> int:
         p.error(M("delegate_bad", given=args.delegate))
     text = args.rules.read_text(encoding="utf-8")
     version, const_version = 1, 1
-    (run_dir / "v1.cadl").write_text(text, encoding="utf-8")
+    # 記録に残すバージョンのファイル：規則に、付録 K の改正の宣言を書き足したもの
+    write_version = lambda n, effective: (run_dir / f"v{n}.cadl").write_text(
+        versioned(text, n, n - 1 if n > 1 else None, effective, const, read_params(text)),
+        encoding="utf-8")
+    write_version(1, 1)
     delegated = lambda side: ("regulation" in delegate if side == "regulator"
                               else bool(delegate & {"rule", "contract"}))
     decider_of = lambda side: (("llm-regulator" if side == "regulator" else "llm-decider")
@@ -396,6 +413,7 @@ def main() -> int:
                        dr.parties("steward", "cadl-robot-town town.steward", MODEL, "llm", args.decider,
                                   delegate=delegate, regulator=True),
                        M("dr_time_base"))
+    record.version(1, "steward", 1, 1, run_dir / "v1.cadl", None)
     fus: dict = {}                      # 後で確かめる約束：id → 内容、種類、まだ果たされていないか
     gen = lambda req: {"model": MODEL, "request_digest": llm_steward.request_digest(req)}
     kpi_in_force = None                 # 有効な KPI の記録（K<k>.d、または書かれた KPI の K<k>）
@@ -412,9 +430,10 @@ def main() -> int:
         (run_dir / "history.md").write_text(M("history_title") + "".join(history), encoding="utf-8")
         record.save(complete=False)
 
-    def open_follow_ups() -> str:
+    def open_follow_ups(kind: str | None = None) -> str:
         return "\n".join(M("follow_ups_open", fid=f, kind=M("fu_" + x["kind"]), due=x["due"] or "—",
-                            by=x["by"], text=x["text"]) for f, x in fus.items() if x["open"])
+                            by=x["by"], text=x["text"]) for f, x in fus.items()
+                         if x["open"] and kind in (None, x["kind"]))
 
     def decide(rid: str, ids: list[str], rpath: Path, k: int, options_text: str,
                side: str = "operator") -> dict:
@@ -442,8 +461,9 @@ def main() -> int:
         ans = {"choice": str(data["choice"]), "reason": data["reason"],
                "assumptions": data.get("assumptions") or [], "unknowns": data.get("unknowns") or [],
                "predictions": data.get("predictions") or [],
+               # 約束の種類：remeasure、propose、ask（以前の記録の action は ask）
                "follow_ups": [{"text": f["text"], "due": f.get("due_period"),
-                               "remeasure": f.get("kind") == "remeasure",
+                               "kind": f.get("kind") if f.get("kind") in FU_KINDS else "ask",
                                "metrics": f.get("metrics") or []}
                               for f in data.get("follow_ups") or []],
                # 約束の id は記録にあるものだけ（果たしたかは、検証器が fulfilled_by で確かめる）
@@ -453,12 +473,20 @@ def main() -> int:
         return ans
 
     def follow_ups(rid: str, k: int, ans: dict, m0: str | None = None, sim0: dict | None = None) -> None:
-        """判断とともにした約束を記録する。測り直しの約束（remeasure）は、この期の現行の測定
-        （m0）と同じ条件で測った値だけが果たす。m0 がない判断（KPI の読み方）では行動とする。"""
+        """判断とともにした約束を記録する。種類は 3 つ。測り直し（remeasure）は、この期の現行の
+        測定（m0）と同じ条件で steward が測った値だけが果たす（m0 がない KPI の読み方の判断では
+        問い）。案を出す約束（propose）は、後の期の改正案が果たす。問い（ask）は、後の判断が
+        果たす。"""
         human = not ans["by"].startswith("llm")
         for n, f in enumerate(ans.get("follow_ups") or [], 1):
             fid, due = f"{rid}.f{n}", f.get("due")
-            remeasure = bool(f.get("remeasure")) and m0 is not None
+            kind = f.get("kind") or ("remeasure" if f.get("remeasure") else "ask")
+            if kind not in FU_KINDS:
+                finish()
+                raise SystemExit(M("a_kind_bad", rid=rid, kind=kind))
+            if kind == "remeasure" and m0 is None:
+                kind = "ask"
+            remeasure = kind == "remeasure"
             subjects = []
             for s in (f.get("metrics") or []) if remeasure else []:
                 s = str(s) if str(s).startswith("metric:") else f"metric:{s}"
@@ -471,17 +499,18 @@ def main() -> int:
                 subjects.append(s)
             record.follow_up(fid, ans["by"], k, str(f["text"]),
                              int(due) if isinstance(due, int) else None, rid,
-                             remeasure_of=m0 if remeasure else None, subjects=subjects)
-            fus[fid] = {"text": str(f["text"]), "kind": "remeasure" if remeasure else "action",
+                             remeasure_of=m0 if remeasure else None, subjects=subjects, kind=kind)
+            fus[fid] = {"text": str(f["text"]), "kind": kind,
                         "due": due, "by": ans["by"], "open": True, "k0": k, "sim": sim0,
                         "m0": m0, "subjects": subjects}
         for x in ans.get("fulfils") or []:
-            if x in fus and fus[x]["kind"] == "action":
+            if x in fus and fus[x]["kind"] == "ask":
                 fus[x]["open"] = False
 
     def regulate(k, env, regs, period_entries, kpi_in_force, kpi_goal, m0, sim, spec, evidence,
-                 version, const_version) -> int:
-        """規制の案への判断要求 R<k>、推奨、判断、憲法の新しい版。const_version を返す。"""
+                 version, const_version) -> tuple[int, int]:
+        """規制の案への判断要求 R<k>、推奨、判断、憲法の新しい版。規制を変えたら、規制の値を
+        書いたモデルの新しいバージョン（付録 K）も作る。(const_version, version) を返す。"""
         pid = lambda cid: f"P{k}.{cid}"
         rid, ids = f"R{k}", [c.cid for c in regs] + [KEEP]
         reasons = "\n".join(M("item", id=c.cid, label=c.label or c.title, text=reason_text(c, spec))
@@ -515,7 +544,9 @@ def main() -> int:
         print("  " + "\n  ".join(body[2:4]))
         print(M("reco", id=rdata["recommendation"]["id"], reason=rdata["recommendation"]["reason"]))
         oid = lambda i: KEEP if i == KEEP else pid(i)
-        basis = [kpi_in_force, m0] + [x for c in regs for x in (pid(c.cid), f"{pid(c.cid)}.c")]
+        basis = [kpi_in_force, m0] + [x for c in regs for x in
+                                      (pid(c.cid), f"{pid(c.cid)}.m", f"{pid(c.cid)}.c")
+                                      if record.get(x) is not None]
         record.add(f"{rid}.req", "request", "steward", k, to=decider_of("regulator"),
                    question=rdata["question"], options=[oid(i) for i in ids],
                    why=[{"option": pid(c.cid), "reason": reason_text(c, spec)} for c in regs])
@@ -540,7 +571,9 @@ def main() -> int:
             cfile = run_dir / f"constitution-v{const_version}.yaml"
             cfile.write_text(yaml.safe_dump(const, allow_unicode=True, sort_keys=False), encoding="utf-8")
             attachments = [{"path": cfile.name, "sha256": dr.sha256(cfile), "media_type": "application/yaml"}]
-            what = M("reg_adopted", label=chosen.label, v=const_version)
+            version += 1
+            write_version(version, k + 1)
+            what = M("reg_adopted", label=chosen.label, v=const_version, mv=version)
         human = not ans["by"].startswith("llm")
         who = M("regulator") if human else M("llm_regulator")
         print(M("outcome", who=who, what=what))
@@ -577,8 +610,9 @@ def main() -> int:
         if chosen is not None:
             record.add(f"C{const_version}", "note", "steward", k, attachments=attachments,
                        text=M("dr_constitution", v=const_version, label=chosen.label))
+            record.version(version, "steward", k, k + 1, run_dir / f"v{version}.cadl", rid)
         log.append({"id": rid, "period": k, "who": who, "summary": what, "reason": ans["reason"]})
-        return const_version
+        return const_version, version
 
     for k in range(1, args.rounds + 1):
         env = periods[(k - 1) % len(periods)]
@@ -747,7 +781,7 @@ def main() -> int:
                 f"{n} {kpi.fmt(n, x)}" for n, x in cur_vals.items()), "".join(history),
             decisions_brief(log), revisit,
             const_text if const_version == 1 else yaml.safe_dump(const, allow_unicode=True, sort_keys=False),
-            text, args.lang)
+            text, args.lang, open_follow_ups=open_follow_ups("propose"))
         data, note = rec.get(f"p{k}-propose", req)
         print(M("llm", note=M.note(note)))
         if data is None and args.llm == "replay":
@@ -756,10 +790,12 @@ def main() -> int:
         data = data or {"assessment": "", "proposals": [], "regulation_proposals": []}
         if data["assessment"]:
             print(M("assessment", text=data["assessment"]))
+        proposable = {f for f, x in fus.items() if x["open"] and x["kind"] == "propose"}
+        carries = lambda x: [str(f) for f in x.get("fulfils") or [] if str(f) in proposable]
         cands = [Cand(str(i), x["title"], x["rationale"], "amend", text=x["cadl"],
                       llm_flag=x.get("why_human", "") if x.get("needs_human") else "",
                       assumptions=x.get("assumptions") or [], unknowns=x.get("unknowns") or [],
-                      predictions=x.get("predictions") or [])
+                      predictions=x.get("predictions") or [], fulfils=carries(x))
                  for i, x in enumerate((data.get("proposals") or [])[:llm_steward.MAX_PROPOSALS], 1)]
         for c in cands:
             measure_amend(c, run_dir / f"p{k}-{c.cid}.cadl", text, cur, cur_vals, const, spec, sim)
@@ -769,7 +805,7 @@ def main() -> int:
         cands = [c for c in cands if c not in dropped]
         regs = [Cand(f"R{i}", x["title"], x["rationale"], "regulation", key=x["key"], value=x["value"],
                  assumptions=x.get("assumptions") or [], unknowns=x.get("unknowns") or [],
-                 predictions=x.get("predictions") or [])
+                 predictions=x.get("predictions") or [], fulfils=carries(x))
                 for i, x in enumerate((data.get("regulation_proposals") or [])[:1], 1)
                 if "regulation" in layers]
         for c in regs:
@@ -793,8 +829,11 @@ def main() -> int:
         pgen = gen(req)
         for c in cands:
             layer = c.layer or None
+            for f in c.fulfils:                     # 案を出す約束は、その案が果たす
+                fus[f]["open"] = False
             period_entries.append(record.add(
-                pid(c.cid), "proposal", "llm", k, generated=pgen, kind="amendment", title=c.title,
+                pid(c.cid), "proposal", "llm", k, generated=pgen, fulfils=c.fulfils,
+                kind="amendment", title=c.title,
                 changes=dr.change(c.label, layer), objective=None, measure=None,
                 affected=(["customers"] if layer == "contract" else
                           ["A", "B", "C", "customers"] if layer == "regulation" else []),
@@ -804,6 +843,12 @@ def main() -> int:
                 period_entries.append(record.measurement(
                     f"{pid(c.cid)}.m", "steward", k, pid(c.cid), c.m, c.vals, sim,
                     compared_with=m0, runs_better=c.seeds_better))
+            elif c.effects:
+                # 規制の案：その期の測定に当てはめた件数と、影響を受ける 3 社と顧客の値
+                # （規制は規則を変えないので、現行の規則の値がそのまま規制の案の下の値）
+                period_entries.append(record.measurement(
+                    f"{pid(c.cid)}.m", "steward", k, pid(c.cid), cur, c.effects, sim,
+                    customers=cur_vals, note=M("dr_reg_method")))
             period_entries.append(record.checks(
                 f"{pid(c.cid)}.c", "steward", k, pid(c.cid), c.gates,
                 "; ".join(x for x in (c.why, c.kpi_why, c.effect) if x)))
@@ -891,7 +936,7 @@ def main() -> int:
         if chosen is not None and chosen.kind == "amend":
             text, ir = chosen.text, compile_rules(run_dir / f"p{k}-{chosen.cid}.cadl")
             version += 1
-            (run_dir / f"v{version}.cadl").write_text(text, encoding="utf-8")
+            write_version(version, k + 1)
             yes = "".join(x for x in sorted(chosen.votes) if chosen.votes[x]) or M("nobody")
             what = M("adopted", v=version, label=chosen.label, layer=M("layer")[chosen.layer],
                      gain=kpi.fmt_gain(spec["goals"][0]["metric"], chosen.gain), yes=yes)
@@ -962,16 +1007,14 @@ def main() -> int:
                        rule=M("dr_auto_rule"), affected=[], result=f"v{version}",
                        **dr.evidence(what if chosen is not None else None))
         if chosen is not None and chosen.kind == "amend":
-            record.add(f"V{version}", "version", "steward", k, version=f"v{version}",
-                       previous=f"v{version - 1}", effective={"period": k + 1},
-                       source_sha256=dr.sha256(run_dir / f"v{version}.cadl"), decision=f"D{k}")
+            record.version(version, "steward", k, k + 1, run_dir / f"v{version}.cadl", f"D{k}")
         log.append({"id": f"D{k}", "period": k, "who": who, "summary": what,
                     "reason": (ans or {}).get("reason", "")})
 
         # 6. 規制（憲法の値）の判断：規則と契約とは別に、規制の担当者（または代わりの LLM）が決める。
         #    規制の変更は次の期から効く。規則のバージョンは変わらない
         if escalated_reg:
-            const_version = regulate(k, env, escalated_reg, period_entries, kpi_in_force, kpi_goal,
+            const_version, version = regulate(k, env, escalated_reg, period_entries, kpi_in_force, kpi_goal,
                                      m0, sim, spec, evidence, version, const_version)
         for f in run_dir.glob(f"p{k}-*.cadl"):          # 不採択の案は消し、採択したバージョンだけを残す
             f.unlink()

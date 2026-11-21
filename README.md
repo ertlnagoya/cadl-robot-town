@@ -256,6 +256,19 @@ hash chain of G.8.
 cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.38 or later
 ```
 
+- Each version of the rules is kept as `runs/<name>/v<n>.cadl` and attached to its `version`
+  entry in the record, the first version `v1` included. These files are the rules with the
+  amendment extension of [Appendix K](https://www.ertl.jp/cadl-spec/docs/spec/appendix-k-amendment)
+  written in by the tool (`town/model.py`): `sos.version` `v<n>`, the operator and the regulator
+  as actors, the values of the regulation in `context.environment`, and `amendment:` with
+  `previous`, `effective`, who decides each layer (the operator decides the rule layer after a
+  vote with the quorum of the constitution, and the contract layer; the regulator decides the
+  regulation layer) and the amendable parameters with their values, ranges, steps and places.
+  The LLM still reads and writes the rules as in `cadl/robot_town.cadl`. With these files the
+  verifier checks the versions and their order (L-9), that each proposal moves a parameter of
+  the version in force within its range and step (L-10), and who decided and the outcome of the
+  votes (L-11, L-6). A change of the regulation makes a new version of the model too.
+
 - A proposal, a recommendation and a decision carry the same evidence (reason, assumptions,
   unknowns, predictions) whether a person, the LLM or a tool made them. `town.steward` stops
   when a human answer in `answers.yaml` has no reason. An answer may also give `unknowns`,
@@ -265,23 +278,35 @@ cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.38 or later
   under `regulation:`). A regulation proposal goes to the regulator in a request of its own
   (`R<k>`, `p<k>-reg-request.md`, answered under `R<k>` in `answers.yaml`), after the decision
   on the rules and the contract of the same period; a change takes effect in the next period
-  (`constitution-v<n>.yaml`). In the record each decider gives its `layers`, and the steward,
-  which adopts by itself only rule changes, has `["rule"]`.
-- A follow-up says what fulfils it. In an answer, `follow_ups` items have `text`, `due` (a
-  period) and, for a promise to measure again, `remeasure: true` with `metrics` (such as
-  `utility@C`, `road_violations`). The steward makes that measurement at the start of the next
-  period under the conditions of the period of the decision (the same seeds and demand), as
-  `F<k>.<follow-up id>`, which fulfils the promise. Any other follow-up is fulfilled by a later
-  decision that names it in `fulfils`; a decision that names a promise to re-measure does not
-  fulfil it, and the verifier reports `fulfilment not shown`.
+  (`constitution-v<n>.yaml` and a new version of the model). In the record each decider gives
+  its `layers`. The steward (and the council), which adopt rule changes by themselves when all
+  the checks pass, act on behalf of the operator (`on_behalf_of`) with `["rule"]`, so the
+  verifier reports the finding delegated for their decisions.
+- A regulation proposal is measured before the decision: the steward applies the proposed value
+  to the measurements of the version in force and of the proposals of the period and to their
+  votes (no new run), and records how many proposals then meet the invariants and pass the
+  vote, with the values of the companies and the customers under the rules in force
+  (`P<k>.R<i>.m`).
+- A follow-up says what fulfils it, and promises only what someone in the town does. In an
+  answer, `follow_ups` items have `text`, `due` (a period) and `kind`:
+  - `remeasure` (with `metrics`, such as `utility@C`, `road_violations`): the steward measures
+    the rules in force at the start of the next period under the conditions of the period of
+    the decision (the same seeds and demand), as `F<k>.<follow-up id>`, which fulfils it
+    (`remeasure: true` is read as this kind);
+  - `propose`: an amendment to measure; the LLM that proposes amendments sees the open ones in a
+    later period, and a proposal that carries one out names it in `fulfils`;
+  - `ask` (the default): a question that a later decision settles by naming it in `fulfils`.
+  A decision that names a promise of another kind does not fulfil it, and the verifier reports
+  `fulfilment not shown`.
 - With `--decider llm`, the LLM answers the decision requests in place of the human for the
   layers given with `--delegate` (default `rule,contract`; `rule` and `contract` go together,
   since they are decided in one request). It acts for the operator as `llm-decider`
   (`llm/p<k>-decide.json`, `llm/p<k>-kpi-decide.json`) and for the regulator as
   `llm-regulator` (`llm/p<k>-reg-decide.json`); requests on the other layers go to the human.
-  The LLM sees the open follow-ups, says which of them a decision fulfils (`fulfils`), and
-  marks its own follow-ups as `remeasure` or `action`. The verifier reports the finding
-  delegated for each of its decisions.
+  The LLM sees the open follow-ups, says which questions a decision settles (`fulfils`), and
+  gives each of its own follow-ups a kind (`remeasure`, `propose`, `ask`). It is told not to
+  promise investigations that nobody in the town carries out, and not to restate an open
+  promise. The verifier reports the finding delegated for each of its decisions.
 - `--layers rule,contract` keeps the proposals to the rule and contract layers (regulation
   proposals are left out unmeasured).
 - Samples, decided by the LLM in place of the humans (Claude Opus 5.5, 2026-11-21):

@@ -40,6 +40,7 @@ import yaml
 
 from . import decisions as dr
 from . import kpi, llm_council
+from .model import versioned
 from .period import (CONSTITUTION, DEFAULT_RULES, ROOT, SCENARIO, CompileError,
                      compile_rules, evaluate)
 
@@ -198,7 +199,9 @@ def main() -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
     text = args.rules.read_text(encoding="utf-8")
     version = 1
-    (run_dir / f"v{version}.cadl").write_text(text, encoding="utf-8")
+    # 記録に残すバージョンのファイル：規則に、付録 K の改正の宣言を書き足したもの
+    (run_dir / f"v{version}.cadl").write_text(
+        versioned(text, version, None, 1, const, read_params(text)), encoding="utf-8")
     history = [f"# 改正履歴（目標: {args.objective}，運用モード: {args.mode}，"
                f"改正案: {args.proposer}）\n"]
 
@@ -212,6 +215,7 @@ def main() -> int:
                        dr.parties("council", "cadl-robot-town town.council",
                                   llm_council.MODEL if proposer == "llm" else None, proposer, "tool"),
                        "ロボットの街のシミュレーションの 1 時間（1 期）")
+    record.version(1, "council", 1, 1, run_dir / "v1.cadl", None)
     direction = "increase" if args.objective == "on_time_deliveries" else "decrease"
     metric = {"violations": "violation_total"}.get(args.objective, args.objective)
     objective = record.add("K1", "objective", "operator", 1,
@@ -272,7 +276,8 @@ def main() -> int:
                 pass
             moved = [(k, old_p[k], new_p[k]) for k in old_p
                      if new_p and k in new_p and abs(old_p[k] - new_p[k]) > 1e-9]
-            changes = ([{"parameter": k, "from": f"{a:g}", "to": f"{b:g}",
+            unit = lambda k: "s" if const["amendable"].get(k, {}).get("unit") == "s" else ""
+            changes = ([{"parameter": k, "from": f"{a:g}{unit(k)}", "to": f"{b:g}{unit(k)}",
                          "layer": const["amendable"].get(k, {}).get("layer")} for k, a, b in moved]
                        or dr.change(prop["title"], None))
             reason = prop.get("rationale") or f"neighbors: {prop['title']}（1 つのパラメータを 1 ステップ動かす案）"
@@ -334,7 +339,8 @@ def main() -> int:
                                if abs(a - read_params(new_text)[k]) > 1e-9}.items()
         text = new_text
         version += 1
-        (run_dir / f"v{version}.cadl").write_text(text, encoding="utf-8")
+        (run_dir / f"v{version}.cadl").write_text(
+            versioned(text, version, version - 1, rnd + 1, const, read_params(text)), encoding="utf-8")
         label = fmt(name, old, new, const["amendable"][name]["unit"])
         yes = "".join(c for c in sorted(votes) if votes[c])
         print(f"  → 採択: {label}（目標 {gain:+.1f}，賛成 {yes}）。v{version}.cadl として保存。")
@@ -344,9 +350,7 @@ def main() -> int:
                    options=options, choice=best_id, procedure="automatic", rule=rule,
                    affected=[c for c in sorted(votes) if not votes[c]], result=f"v{version}",
                    **dr.evidence(f"{label}（目標 {gain:+.1f}，賛成 {yes}）"))
-        record.add(f"V{version}", "version", "council", rnd, version=f"v{version}",
-                   previous=f"v{version - 1}", effective={"period": rnd + 1},
-                   source_sha256=dr.sha256(run_dir / f"v{version}.cadl"), decision=f"D{rnd}")
+        record.version(version, "council", rnd, rnd + 1, run_dir / f"v{version}.cadl", f"D{rnd}")
         record.save()
 
     for f in run_dir.glob("round*.cadl"):          # 不採択の案は消し、採択したバージョンだけを残す
