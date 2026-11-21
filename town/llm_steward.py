@@ -168,6 +168,27 @@ PROPOSE_SCHEMA = {
     "additionalProperties": False,
 }
 
+def _propose_schema(fulfils: bool) -> dict:
+    """まだ果たされていない、案を出す約束（propose）があるときだけ、各案に fulfils を加える。
+    約束がないときの依頼は、これまでと同じ（記録した LLM の出力の再生が変わらないように）。"""
+    if not fulfils:
+        return PROPOSE_SCHEMA
+    schema = json.loads(json.dumps(PROPOSE_SCHEMA))
+    for key in ("proposals", "regulation_proposals"):
+        item = schema["properties"][key]["items"]
+        item["properties"]["fulfils"] = {
+            "type": "array", "items": {"type": "string"},
+            "description": "The ids of the open follow-ups (listed in the request) that this "
+                           "proposal carries out; empty if none."}
+        item["required"].append("fulfils")
+    return schema
+
+
+PROPOSE_FULFILS = """
+- 依頼に「まだ果たされていない、案を出す約束」があれば、それを読んで、約束した案を出すかを
+  決めます。約束を実行する案には、fulfils にその約束の id を挙げます。案が約束の内容と
+  違うときは、挙げません。"""
+
 PROPOSE_SYSTEM = ROLES + f"""
 いまの依頼は、この期の観測を見て、KPI の達成に向けた改正案を出すことです。
 
@@ -242,22 +263,24 @@ DECIDE_SCHEMA = {
             "properties": {
                 "text": {"type": "string"},
                 "due_period": {"type": "integer"},
-                "kind": {"type": "string", "enum": ["remeasure", "action"],
+                "kind": {"type": "string", "enum": ["remeasure", "propose", "ask"],
                          "description": "remeasure: measure the rules in force again under the "
                                         "conditions of this period (the same seeds and demand); "
-                                        "the steward does it in the next period. action: "
-                                        "anything else; a later decision fulfils it."},
+                                        "the steward does it in the next period. propose: an "
+                                        "amendment to measure (one parameter, one step of the "
+                                        "constitution); the LLM that proposes amendments reads "
+                                        "it in a later period, and a proposal fulfils it. "
+                                        "ask: a question that a later decision settles."},
                 "metrics": {"type": "array", "items": {"type": "string"},
                             "description": "For remeasure: the values to measure again, as "
                                            "'metric:<name>' (a metric of the measured table) or "
                                            "'metric:utility@<company>' (A, B, C). Empty for "
-                                           "action."},
+                                           "propose and ask."},
             },
             "required": ["text", "due_period", "kind", "metrics"], "additionalProperties": False}},
         "fulfils": {"type": "array", "items": {"type": "string"},
-                    "description": "The ids of open follow-ups (listed in the request) that "
-                                   "this decision fulfils. Only an action can be fulfilled by "
-                                   "a decision; empty if none."},
+                    "description": "The ids of open follow-ups of kind ask (listed in the "
+                                   "request) that this decision settles; empty if none."},
     },
     "required": ["choice", "reason", "assumptions", "unknowns", "predictions", "follow_ups",
                  "fulfils"],
@@ -277,10 +300,17 @@ DECIDE_SYSTEM = ROLES + """
 - unknowns：判断に関わるのに、知らないこと、測っていないこと。
 - predictions：選んだ選択肢で、次に何が起こると予測するか。
 - follow_ups：後で確かめることと、その期（due_period）。なければ空にします。
-  kind は、この期と同じ条件（同じ乱数シードと需要）で、いまの規則を測り直すことなら
-  remeasure、それ以外なら action です。remeasure は次の期に steward が測り直し、
-  metrics に挙げた値がそろえば果たされます。action は、後の判断が果たします。
-- fulfils：依頼に挙げた、まだ果たされていない約束のうち、この判断が果たす action の id。
+  約束してよいのは、街の中の誰かが実行することだけです。kind は次のどれかです。
+  - remeasure：この期と同じ条件（同じ乱数シードと需要）で、いまの規則を測り直す。次の期に
+    steward が測り直し、metrics に挙げた値がそろえば果たされます。
+  - propose：改正案を測る。改正案を出す LLM が後の期にこれを読み、その案が果たします。
+    改正案は、1 回に 1 つのパラメータを、憲法の刻みで 1 ステップだけ動かします。いくつかの
+    パラメータを組み合わせた案や、刻みの間の値の案は出せないので、約束しません。text には、
+    どのパラメータをどの値に動かす案かを書きます。
+  - ask：後の判断で決める問い。後の判断が fulfils に挙げると果たされます。
+  街の中で誰も行わない調べもの（違反を種類ごとに数える、各社に聞く、など）は約束しません。
+  まだ果たされていない約束を、言い換えて出し直してはいけません。約束は id のまま残ります。
+- fulfils：依頼に挙げた、まだ果たされていない ask の約束のうち、この判断で決めるものの id。
   なければ空にします。
 顧客は投票に加わりません。契約（顧客への約束）を変えるときは、顧客への影響を理由に書きます。
 文章はすべて日本語で書いてください。比喩は使わず、そのままの言葉で書いてください（「関門」ではなく「判定」、「測り方」ではなく「評価方法」、「見張る」ではなく「監視する」、「狙い」ではなく「意図」、「見立て」ではなく「所見」、「損得」ではなく「利害」）。"""
@@ -313,7 +343,8 @@ def kpi_request(text: str, since: int, previous: str | None, decisions: str, lan
 
 def propose_request(kpi_text: str, spec: dict, mode_note: str, env: dict, observation: str,
                     history: str, decisions: str, revisit: str, constitution: str,
-                    rules: str, lang: str = "ja") -> dict:
+                    rules: str, lang: str = "ja", open_follow_ups: str = "") -> dict:
+    """open_follow_ups：まだ果たされていない、案を出す約束（あれば、案に fulfils を加える）。"""
     user = (
         f"## KPI（人間が書いたもの）\n{kpi_text}\n\n"
         f"## KPI の評価方法（人間が確かめたもの）\n```json\n{json.dumps(spec, ensure_ascii=False, indent=1)}\n```\n\n"
@@ -327,7 +358,11 @@ def propose_request(kpi_text: str, spec: dict, mode_note: str, env: dict, observ
         + f"## 憲法（constitution.yaml）\n```yaml\n{constitution}```\n\n"
         f"## 現行の規則（cadl/robot_town.cadl）\n```yaml\n{rules}```\n"
     )
-    return _request(_lang(PROPOSE_SYSTEM, lang), user, PROPOSE_SCHEMA)
+    system = PROPOSE_SYSTEM
+    if open_follow_ups:
+        user += f"\n## まだ果たされていない、案を出す約束\n{open_follow_ups}\n"
+        system = system.replace("\nまず assessment に", PROPOSE_FULFILS + "\nまず assessment に", 1)
+    return _request(_lang(system, lang), user, _propose_schema(bool(open_follow_ups)))
 
 
 def request_request(kpi_text: str, spec_text: str, reasons: str, table: str, options: str,

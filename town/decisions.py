@@ -6,12 +6,15 @@ decisions.md、gsn.yaml と同じ実行を、機械で読める形で残す。
 - 当事者：KPI を書き、規則と契約について判断する人間（operator）、規制（憲法）について
   判断する人間（regulator、steward のみ）、提案し推奨する LLM（llm）、判断要求に人間に
   代わって答える LLM（--decider llm のとき。運営者に代わる llm-decider、規制の担当者に
-  代わる llm-regulator）、測って判定し、判定をすべて通った規則の案を自動で採択する
-  ツール（steward または council）、投票する 3 社（A、B、C）、投票に加わらない顧客
-  （customers）。判断する当事者は、判断してよい層（layers）を持つ。
+  代わる llm-regulator）、測って判定し、判定をすべて通った規則の案を運営者に代わって
+  自動で採択するツール（steward または council）、投票する 3 社（A、B、C）、投票に
+  加わらない顧客（customers）。判断する当事者は、判断してよい層（layers）を持つ。
 - 項目：目的（KPI）、改正案、測定、判定、投票、判断要求、推奨、判断、バージョン、
   後で確かめる約束（何が果たすか、fulfilled_by を持つ）。人間でも LLM でもツールでも、提案・推奨・判断には同じ証拠の
   フィールド（理由、前提、分からないこと、予測）を持たせる。
+- バージョン：各バージョンのファイル（v<n>.cadl。付録 K の改正の宣言つき、town/model.py）を
+  version の項目に添付する。最初のバージョン v1 も記録する。検証器はこれを読んで、版の順序、
+  案の値の範囲、決定権と投票の結果（L-9〜L-11、L-6）を確かめる。
 - 完全性：各行に、付録 G の G.8 のハッシュの連鎖（seq、prev、digest）を付ける。
 
     cadl decisions-verify runs/<名前>/decisions.jsonl     # 検査と、確認のための指摘
@@ -24,6 +27,8 @@ import datetime as dt
 import hashlib
 import re
 from pathlib import Path
+
+from .model import param_id
 
 FILE = "decisions.jsonl"
 KEEP = "keep"
@@ -74,8 +79,9 @@ def parties(tool: str, tool_version: str, llm_model: str | None, proposer: str,
     if regulator and "regulation" in delegate:
         out.append(party("llm-regulator", "llm", ["decider"], "LLM deciding for the regulator",
                          None, llm_model, on_behalf_of="regulator", layers=REGULATOR_LAYERS))
+    # ツールは、判定をすべて通った規則の案を運営者に代わって採択する（付録 K の決定権は運営者）
     out.append(party(tool, "tool", tool_roles, f"town.{tool}", None, tool_version,
-                     layers=["rule"]))
+                     on_behalf_of="operator", layers=["rule"]))
     out += [party(c, "agent", ["voter"], f"company {c}") for c in ("A", "B", "C")]
     out.append(party("customers", "organisation", ["affected"], "customers"))
     return out
@@ -85,10 +91,10 @@ def change(label: str, layer: str | None) -> list[dict]:
     """「block_k 3 → 2」「hold_limit 60s → 70s」を、改正の変更の並びに。"""
     m = _LABEL.match(label or "")
     if not m:
-        return [{"parameter": (label or "?").split(" ")[0] or "?", "from": None, "to": None,
-                 "layer": layer}]
+        return [{"parameter": param_id((label or "?").split(" ")[0] or "?"), "from": None,
+                 "to": None, "layer": layer}]
     unit = m.group("unit")
-    return [{"parameter": m.group("name"), "from": m.group("a") + unit, "to": m.group("b") + unit,
+    return [{"parameter": param_id(m.group("name")), "from": m.group("a") + unit, "to": m.group("b") + unit,
              "layer": layer}]
 
 
@@ -184,29 +190,44 @@ class Record:
     # --- 共通の項目 ---------------------------------------------------------
     def measurement(self, eid: str, by: str, period: int, of: str, m: dict, vals: dict,
                     sim: dict, compared_with: str | None = None, runs_better: int | None = None,
-                    version: str | None = None, fulfils=()) -> str:
+                    version: str | None = None, fulfils=(), customers: dict | None = None,
+                    note: str | None = None) -> str:
+        """customers：顧客の値を vals 以外から取るとき。note：測り方の説明に書き足すこと。"""
         per = {c: {"utility": round(x["utility"], 3), "on_time_rate": round(x["on_time_rate"], 4),
                    "late_deliveries": round(x["late"], 3), "p95_wait_s": round(x["p95_wait_s"], 3)}
                for c, x in sorted(m["companies"].items())}
-        per["customers"] = {k: round(vals[k], 4) for k in
+        src = vals if customers is None else customers
+        per["customers"] = {k: round(src[k], 4) for k in
                             ("late_deliveries", "unfinished", "worst_company_p95_wait_s", "p95_wait_s")
-                            if k in vals}
+                            if k in src}
         return self.add(eid, "measurement", by, period, fulfils=fulfils, of=of, version=version,
                         method={"runs": len(sim["seeds"]), "window": f"{sim['period_s']}s",
-                                "description": conditions(sim)},
+                                "description": conditions(sim) + (f"; {note}" if note else "")},
                         values={k: round(float(v), 4) for k, v in vals.items()},
                         per_party=per, compared_with=compared_with, runs_better=runs_better)
 
     def follow_up(self, eid: str, by: str, period: int, text: str, due: int | None,
-                  decision: str, remeasure_of: str | None = None, subjects=()) -> str:
+                  decision: str, remeasure_of: str | None = None, subjects=(),
+                  kind: str = "ask") -> str:
         """後で確かめる約束。remeasure_of があれば、その測定と同じ条件での測り直しだけが果たす。
-        なければ、後の判断がそれを果たしたと書く（fulfils）。"""
+        kind が propose なら後の改正案が、ask なら後の判断が果たす（fulfils に挙げる）。"""
         fulfilled_by = ({"type": "measurement", "of": "in_force", "same_method_as": remeasure_of,
                          "subjects": list(subjects)} if remeasure_of else
-                        {"type": "decision", "of": None, "same_method_as": None, "subjects": []})
+                        {"type": "proposal" if kind == "propose" else "decision", "of": None,
+                         "same_method_as": None, "subjects": []})
         return self.add(eid, "follow_up", by, period, text=text,
                         due={"period": due} if isinstance(due, int) and due >= 1 else None,
                         decision=decision, fulfilled_by=fulfilled_by)
+
+    def version(self, n: int, by: str, period: int, effective: int, path: Path,
+                decision: str | None) -> str:
+        """バージョン v<n> の項目。ファイル（付録 K の宣言つき）を添付する。"""
+        sha = sha256(path)
+        return self.add(f"V{n}", "version", by, period, version=f"v{n}",
+                        previous=f"v{n - 1}" if n > 1 else None, effective={"period": effective},
+                        source_sha256=sha, decision=decision,
+                        attachments=[{"path": path.name, "sha256": sha,
+                                      "media_type": "application/yaml"}])
 
     def checks(self, eid: str, by: str, period: int, proposal: str, gates: dict, notes: str) -> str:
         results = [{"name": GATE_NAMES.get(g, g), "passed": v, "note": None}

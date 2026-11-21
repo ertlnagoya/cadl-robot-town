@@ -456,6 +456,17 @@ CADL 仕様の[付録 L](https://www.ertl.jp/cadl-spec/ja/docs/spec/appendix-l-d
 cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.38 以降
 ```
 
+- 規則の各バージョンは `runs/<名前>/v<n>.cadl` に残し、記録の version の項目に添付する（最初の
+  バージョン `v1` も）。このファイルは、規則に、[付録 K](https://www.ertl.jp/cadl-spec/ja/docs/spec/appendix-k-amendment)
+  の改正の宣言をツールが書き足したもの（`town/model.py`）。`sos.version` を `v<n>` に、運営者と
+  規制の担当者を actor に、規制の値を `context.environment` に、`amendment:` に `previous`、
+  `effective`、層ごとに誰が決めるか（規則の層は運営者が、憲法の定足数での投票を経て決める。契約の
+  層は運営者、規制の層は規制の担当者）と、改正してよいパラメータ（値、範囲、刻み、場所）を書く。
+  LLM が読み書きする規則は、これまでどおり `cadl/robot_town.cadl` の形。検証器はこのファイルで、
+  バージョンとその順序（L-9）、案が現行のバージョンのパラメータを範囲と刻みの中で動かしているか
+  （L-10）、誰が決めたかと投票の結果（L-11、L-6）を確かめる。規制を変えると、モデルの新しい
+  バージョンもできる。
+
 - 人間でも LLM でもツールでも、提案・推奨・判断には同じ証拠（理由、前提、分からないこと、予測）を
   残す。人間の答え（`answers.yaml`）に理由がないと、`town.steward` は止まる。答えには
   `unknowns`（分からないこと）、`follow_ups`（後で確かめること）、`fulfils`（前に約束したことを
@@ -463,19 +474,29 @@ cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.38 以降
 - 誰が何を判断するか：運営者は規則と契約（と KPI の読み方）について、運営者とは別の人間である規制の
   担当者は規制（憲法の `regulation:` に挙がった値）について判断する。規制の案は、同じ期の規則と
   契約の判断の後に、別の判断要求（`R<k>`、`p<k>-reg-request.md`。答えは `answers.yaml` の `R<k>`）で
-  規制の担当者に出す。規制の変更は次の期から効く（`constitution-v<n>.yaml`）。記録では、判断する
-  当事者が判断してよい層（`layers`）を持つ。規則の変更しか自分で採択しない steward は `["rule"]`。
-- 約束は、何がそれを果たすかを持つ。答えの `follow_ups` の項目は、`text`、`due`（期）と、測り直す
-  約束なら `remeasure: true` と `metrics`（例 `utility@C`、`road_violations`）を持つ。steward は、
-  次の期の初めに、判断した期と同じ条件（同じ乱数シードと需要）で測り直し、`F<k>.<約束の id>` として
-  記録する。この測定が約束を果たす。ほかの約束は、後の判断が `fulfils` でそれを挙げれば果たされる。
-  測り直す約束を判断が `fulfils` で挙げても約束は果たされず、検証器は fulfilment not shown を報告する。
+  規制の担当者に出す。規制の変更は次の期から効く（`constitution-v<n>.yaml` と、モデルの新しいバージョン）。記録では、
+  判断する当事者が判断してよい層（`layers`）を持つ。判定をすべて通った規則の変更を自分で採択する
+  steward（と council）は、運営者に代わって（`on_behalf_of`）`["rule"]` について判断する。そのため
+  検証器は、その判断に指摘 delegated を出す。
+- 規制の案は、判断の前に測る。steward は、案の値を、その期に測った現行の規則と案、その投票に
+  当てはめ（新しい実行はしない）、不変条件を満たす案と投票を通る案の数と、現行の規則での各社と
+  顧客の値を記録する（`P<k>.R<i>.m`）。
+- 約束は、何がそれを果たすかを持ち、街の中の誰かが行うことだけを約束する。答えの `follow_ups` の
+  項目は、`text`、`due`（期）、`kind` を持つ。
+  - `remeasure`（`metrics` も。例 `utility@C`、`road_violations`）：steward が、次の期の初めに、
+    判断した期と同じ条件（同じ乱数シードと需要）で現行の規則を測り直し、`F<k>.<約束の id>` として
+    記録する。この測定が約束を果たす（`remeasure: true` もこの種類として読む）。
+  - `propose`：改正案を測る約束。改正案を出す LLM が後の期にまだ果たされていない約束を読み、それを
+    実行する案が `fulfils` で挙げると果たされる。
+  - `ask`（既定）：後の判断で決める問い。後の判断が `fulfils` で挙げると果たされる。
+  種類の違う約束を判断が `fulfils` で挙げても約束は果たされず、検証器は fulfilment not shown を報告する。
 - `--decider llm` では、`--delegate` で与えた層（既定は `rule,contract`。`rule` と `contract` は同じ
   判断要求で扱うので、両方を任せるか、どちらも任せない）について、人間に代わって LLM が判断要求に
   答える。運営者に代わるときは `llm-decider`（`llm/p<k>-decide.json`、`llm/p<k>-kpi-decide.json`）、
   規制の担当者に代わるときは `llm-regulator`（`llm/p<k>-reg-decide.json`）として記録される。任せない
-  層の判断要求は人間に出す。LLM は、まだ果たされていない約束を読み、判断が果たす約束を `fulfils` に
-  挙げ、自分の約束を測り直し（`remeasure`）か行動（`action`）に分ける。検証器は、LLM の判断ごとに
+  層の判断要求は人間に出す。LLM は、まだ果たされていない約束を読み、判断で決める問いを `fulfils` に
+  挙げ、自分の約束に種類（`remeasure`、`propose`、`ask`）を付ける。街の中で誰も行わない調べものは
+  約束せず、まだ果たされていない約束を出し直さないよう指示している。検証器は、LLM の判断ごとに
   指摘 delegated を出す。
 - `--layers rule,contract` で、改正案を規則と契約の層に限る（規制の案は測らずに除く）。
 - 見本（Claude Opus 5.5 が人間に代わって判断した、2026-11-21 の記録）：`examples/steward-contract/`
