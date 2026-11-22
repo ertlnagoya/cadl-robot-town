@@ -1,8 +1,8 @@
 {
-  "note": "claude-opus-5-5、入力 11164 / 出力 523 トークン",
-  "request_digest": "11905c1ea71c582f",
+  "note": "claude-opus-5-5、入力 11957 / 出力 870 トークン",
+  "request_digest": "eccca6917761972a",
   "data": {
-    "assessment": "In this quiet period the current rules deliver 87.2 of 87.4 orders on time, with 0.2 late deliveries, 0.0 unfinished and a weakest company on-time rate of 0.99, so customers are almost fully served. At most about 0.2 more on-time deliveries are possible, which is below the constitution's min_improvement of 1.0, so no rule or contract change could pass the improvement gate or meaningfully advance the KPI this period. One imbalance between companies remains, and it is not a customer problem: C carries 22.6 penalty points from 21.4 hold-limit overstays under sanction_lambda 1.0, which leaves its utility at 8.4 against A's 27.4 and B's 28.8. Any change aimed at that would not raise on-time deliveries, so I propose nothing this period and leave C's penalty burden to be watched.",
+    "assessment": "In this quiet period under v2 (sanction_lambda 1.0), service is at its ceiling: 87.2 of 87.4 orders were on time, with 0.2 late, 0 unfinished, a lowest company on-time rate of 0.99 and a worst-company p95 wait of 81.2 s. At most 0.2 on-time deliveries can still be gained, below the constitution's min_improvement of 1.0, so no rule amendment can pass the improvement gate. Contract loosening would only inflate the count without helping customers, and no vote or invariant is blocking a customer-beneficial change. One thing to watch is the doubled sanction weight: C carries almost all penalties (22.6, almost all from deadline:release overstays). Its utility is 8.4 against A's 27.4 and B's 28.8, which may harden C's votes in busier periods. This is a company-utility issue, not a customer KPI shortfall, so I propose no change this period.",
     "proposals": [],
     "regulation_proposals": []
   }

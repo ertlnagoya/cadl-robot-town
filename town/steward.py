@@ -88,6 +88,7 @@ class Cand:
     kpi_why: str = ""
     effect: str = ""                  # regulation：この規制が何を変えるか
     effects: dict = field(default_factory=dict)  # regulation：その期の測定に当てはめた件数
+    per_effects: dict = field(default_factory=dict)  # regulation：会社ごとの件数
     reasons: list = field(default_factory=list)
     # 証拠のフィールド（付録 L）：LLM が書いた前提、分からないこと、予測
     assumptions: list = field(default_factory=list)
@@ -148,7 +149,8 @@ def measure_amend(c: Cand, path: Path, cur_text: str, cur: dict, cur_vals: dict,
     c.worse = kpi.worsened(spec, cur_vals, c.vals)
 
 
-def measure_regulation(c: Cand, const: dict, cur: dict, others: list[Cand]) -> None:
+def measure_regulation(c: Cand, const: dict, cur: dict, others: list[Cand],
+                       past: list[Cand] = ()) -> None:
     c.layer = "regulation"
     rng = const.get("regulation", {}).get(c.key)
     c.gates["check"] = None                     # 規則ファイルを変えないので、検査はない
@@ -175,13 +177,22 @@ def measure_regulation(c: Cand, const: dict, cur: dict, others: list[Cand]) -> N
         c.effect = M("reg_same") if not flips else M("reg_flip", ids=", ".join(flips))
     # 規制の案の測定（付録 L）：規制は街の動きを変えず、どの案を採れるかを変える。そこで、
     # 新しい値を、その期に測った現行の規則と案、その投票に当てはめて数える（新しい実行はしない）
+    # この期の案だけでなく、記録のそれまでの期に測ったすべての案（past）にも当てはめる（_all）。
+    # 会社ごとには、その会社が反対したのに投票を通る案の数（passing_against）を数える
     measured = [o for o in others if o.m]
+    every = list(past) + measured
+    passes = lambda o, cst: sum(o.votes.values()) >= cst["vote"]["quorum"]
     for tag, cst in (("", new), ("_current", const)):
         c.effects["in_force_meets_invariants" + tag] = int(invariants_ok(cur, cst["invariants"])[0])
         c.effects["proposals_meeting_invariants" + tag] = sum(
             invariants_ok(o.m, cst["invariants"])[0] for o in measured)
-        c.effects["proposals_passing_vote" + tag] = sum(
-            sum(o.votes.values()) >= cst["vote"]["quorum"] for o in measured)
+        c.effects["proposals_passing_vote" + tag] = sum(passes(o, cst) for o in measured)
+        c.effects["proposals_meeting_invariants_all" + tag] = sum(
+            invariants_ok(o.m, cst["invariants"])[0] for o in every)
+        c.effects["proposals_passing_vote_all" + tag] = sum(passes(o, cst) for o in every)
+        for x in ("A", "B", "C"):
+            c.per_effects.setdefault(x, {})["passing_against" + tag] = sum(
+                passes(o, cst) and o.votes.get(x) is False for o in every)
 
 
 def triage(cands: list[Cand], spec: dict) -> tuple[Cand | None, list[Cand]]:
@@ -413,8 +424,18 @@ def main() -> int:
                        dr.parties("steward", "cadl-robot-town town.steward", MODEL, "llm", args.decider,
                                   delegate=delegate, regulator=True),
                        M("dr_time_base"))
+    on_layers = lambda pid: ", ".join(next(p["layers"] for p in record.parties if p["id"] == pid))
+    record.delegations(1, {"steward": [M("dr_auto_rule"), M("dr_kpi_rule")],
+                           "llm-decider": [M("dr_g_llm_cond", layers=on_layers("llm-decider"))]
+                           if delegated("operator") else [],
+                           "llm-regulator": [M("dr_g_llm_cond", layers="regulation")]
+                           if delegated("regulator") else []},
+                       {"steward": M("dr_g_tool"),
+                        "llm-decider": M("dr_g_llm", layers=",".join(sorted(delegate))),
+                        "llm-regulator": M("dr_g_llm", layers=",".join(sorted(delegate)))})
     record.version(1, "steward", 1, 1, run_dir / "v1.cadl", None)
     fus: dict = {}                      # 後で確かめる約束：id → 内容、種類、まだ果たされていないか
+    measured_before: list = []          # それまでの期に測った案（規制の案を当てはめる）
     gen = lambda req: {"model": MODEL, "request_digest": llm_steward.request_digest(req)}
     kpi_in_force = None                 # 有効な KPI の記録（K<k>.d、または書かれた KPI の K<k>）
     ir = compile_rules(run_dir / "v1.cadl")
@@ -436,7 +457,7 @@ def main() -> int:
                          if x["open"] and kind in (None, x["kind"]))
 
     def decide(rid: str, ids: list[str], rpath: Path, k: int, options_text: str,
-               side: str = "operator") -> dict:
+               side: str = "operator", step: str | None = None) -> dict:
         """判断要求への答え：人間（--answers か端末）か、人間に代わる LLM。
         side は判断する人間：operator（規則・契約・KPI の読み方）か regulator（規制）。"""
         if not delegated(side):
@@ -451,7 +472,8 @@ def main() -> int:
                                          decisions_brief(log), args.lang,
                                          principal=M("principal_" + side),
                                          open_follow_ups=open_follow_ups())
-        step = "reg-decide" if side == "regulator" else "kpi-decide" if rid.startswith("K") else "decide"
+        step = step or ("reg-decide" if side == "regulator" else "kpi-decide" if rid.startswith("K")
+                        else "decide")
         data, dnote = rec.get(f"p{k}-{step}", req)
         if data is None or str(data.get("choice")) not in ids or not str(data.get("reason")).strip():
             finish()
@@ -507,6 +529,55 @@ def main() -> int:
             if x in fus and fus[x]["kind"] == "ask":
                 fus[x]["open"] = False
 
+    def answer_asks(k: int, env: dict, last: bool, kpi_in_force: str, kpi_goal) -> None:
+        """期限の来た問い（ask）を、それを約束した側の判断する者に渡して答えてもらう。
+        改正案がなく判断要求がない期でも、問いは期限で判断に付す。最後の期には残った問いを
+        すべて渡す（この後に答える場はない）。規則・契約・規制はこの判断では変えない。"""
+        for side, owners, tag in (("operator", {"operator", "llm-decider"}, "Q"),
+                                  ("regulator", {"regulator", "llm-regulator"}, "QR")):
+            due = [f for f, x in fus.items() if x["open"] and x["kind"] == "ask" and x["by"] in owners
+                   and (last or (isinstance(x["due"], int) and x["due"] <= k))]
+            if not due:
+                continue
+            rid = f"{tag}{k}"
+            items = [M("follow_ups_open", fid=f, kind=M("fu_ask"), due=fus[f]["due"] or "—",
+                       by=fus[f]["by"], text=fus[f]["text"]) for f in due]
+            body = [M("q_req_title", rid=rid, k=k, label=label(env)), "",
+                    M("q_req_body") + (" " + M("q_req_last") if last else ""), ""]
+            body += [f"- {x}" for x in items]
+            rpath = run_dir / f"p{k}-{'ask' if side == 'operator' else 'reg-ask'}.md"
+            rpath.write_text("\n".join(body) + "\n", encoding="utf-8")
+            print(M("q_ask", rid=rid, ids=", ".join(due)))
+            question = M("q_question", ids=", ".join(due))
+            record.add(f"{rid}.req", "request", "steward", k, basis=due, to=decider_of(side),
+                       question=question, options=[KEEP], why=[])
+            ans = decide(rid, [KEEP], rpath, k, M("opt_keep_ask"), side=side,
+                         step="ask" if side == "operator" else "reg-ask")
+            human = not ans["by"].startswith("llm")
+            who = (M("human") if side == "operator" else M("regulator")) if human else \
+                (M("llm_decider") if side == "operator" else M("llm_regulator"))
+            what = M("q_answered", ids=", ".join(due))
+            record.add(rid, "decision", ans["by"], k, basis=[kpi_in_force, f"{rid}.req"] + due,
+                       fulfils=due, generated=ans.get("generated"), question=question,
+                       options=[KEEP], choice=KEEP, procedure="single", rule=None, affected=[],
+                       result=f"v{version}",
+                       **dr.evidence(ans["reason"], ans.get("assumptions"), ans.get("unknowns"),
+                                     dr.predictions(ans.get("predictions"), KEEP)))
+            for f in due:
+                fus[f]["open"] = False
+            follow_ups(rid, k, ans)
+            print(M("outcome", who=who, what=what))
+            history.append(M("history", k=k, label=label(env), what=what, who=who))
+            md.extend([M("q_sec", rid=rid, k=k, label=label(env), who=who)]
+                      + [f"- {x}" for x in items]
+                      + [M("md_result", who=who, what=what),
+                         M("md_reason" if human else "md_reason_llm", text=ans["reason"])])
+            for f in ans.get("follow_ups") or []:
+                md.append(M("md_follow_up", text=f["text"], due=f.get("due") or "—"))
+            md.append("")
+            s_ = gsn.add("strategy", M("gsn_s", k=k, what=what), kpi_goal, ref=rid)
+            attach_answer(gsn, s_, ans)
+
     def regulate(k, env, regs, period_entries, kpi_in_force, kpi_goal, m0, sim, spec, evidence,
                  version, const_version) -> tuple[int, int]:
         """規制の案への判断要求 R<k>、推奨、判断、憲法の新しい版。規制を変えたら、規制の値を
@@ -539,6 +610,8 @@ def main() -> int:
                  M("req_reco", id=rdata["recommendation"]["id"], reason=rdata["recommendation"]["reason"]),
                  "", M("req_unknown"), ""]
         body += [f"- {u}" for u in rdata["unknowns"]] or ["- " + M("none")]
+        if k == args.rounds:              # 最後の期：この後に約束を果たす場はない
+            body += ["", M("q_req_last")]
         rpath = run_dir / f"p{k}-reg-request.md"
         rpath.write_text("\n".join(body) + "\n", encoding="utf-8")
         print("  " + "\n  ".join(body[2:4]))
@@ -809,7 +882,8 @@ def main() -> int:
                 for i, x in enumerate((data.get("regulation_proposals") or [])[:1], 1)
                 if "regulation" in layers]
         for c in regs:
-            measure_regulation(c, const, cur, cands)
+            measure_regulation(c, const, cur, cands, past=measured_before)
+        measured_before += [c for c in cands if c.m and c.votes]
         cands += regs
         best, escalated = triage(cands, spec)
         # 規制の案は、規則と契約とは別の判断要求（R<k>）で、規制の担当者に出す
@@ -848,7 +922,7 @@ def main() -> int:
                 # （規制は規則を変えないので、現行の規則の値がそのまま規制の案の下の値）
                 period_entries.append(record.measurement(
                     f"{pid(c.cid)}.m", "steward", k, pid(c.cid), cur, c.effects, sim,
-                    customers=cur_vals, note=M("dr_reg_method")))
+                    customers=cur_vals, note=M("dr_reg_method"), extra=c.per_effects))
             period_entries.append(record.checks(
                 f"{pid(c.cid)}.c", "steward", k, pid(c.cid), c.gates,
                 "; ".join(x for x in (c.why, c.kpi_why, c.effect) if x)))
@@ -895,6 +969,8 @@ def main() -> int:
                      M("req_reco", id=rdata["recommendation"]["id"], reason=rdata["recommendation"]["reason"]), "",
                      M("req_unknown"), ""]
             body += [f"- {u}" for u in rdata["unknowns"]] or ["- " + M("none")]
+            if k == args.rounds:              # 最後の期：この後に約束を果たす場はない
+                body += ["", M("q_req_last")]
             rpath = run_dir / f"p{k}-request.md"
             rpath.write_text("\n".join(body) + "\n", encoding="utf-8")
             print("  " + "\n  ".join(body[2:4] + body[body.index(M("req_opts")) + 2:body.index(M("req_table")) - 1]))
@@ -1016,6 +1092,7 @@ def main() -> int:
         if escalated_reg:
             const_version, version = regulate(k, env, escalated_reg, period_entries, kpi_in_force, kpi_goal,
                                      m0, sim, spec, evidence, version, const_version)
+        answer_asks(k, env, k == args.rounds, kpi_in_force, kpi_goal)
         for f in run_dir.glob(f"p{k}-*.cadl"):          # 不採択の案は消し、採択したバージョンだけを残す
             f.unlink()
         finish()

@@ -1,0 +1,548 @@
+nodes:
+- id: G0
+  type: goal
+  text: The town keeps meeting the KPIs set by the human
+  supported_by:
+  - S1
+- id: S1
+  type: strategy
+  text: Argue per version of the KPI
+  supported_by:
+  - G1
+- id: G1
+  type: goal
+  text: 'KPI from period 1: Deliver as many orders as possible across the town within
+    the times we promised customers. Leave no company''s customers behind. If the
+    votes of the three companies or the conditions of the constitution (the invariants
+    and the quorum) stand in the way of amendments that are good for customers, a
+    revision of the regulation may be proposed. The regulation reaches all three companies
+    and the customers, so say who is affected and how.'
+  ref: K1
+  in_context_of:
+  - C1
+  - J1
+  - A1
+  - A2
+  - A3
+  supported_by:
+  - S2
+  - S3
+  - S4
+  - S5
+  - S6
+  - S7
+  - S8
+  - S9
+- id: C1
+  type: context
+  text: 'Measure (chosen by the human): main goal on_time_deliveries (increase), min_company_on_time_rate
+    (increase), unfinished (decrease), worst_company_p95_wait_s (decrease)'
+- id: J1
+  type: justification
+  text: 'The KPI''s first sentence makes the town-wide count of orders delivered within
+    the promised times the primary objective, so on_time_deliveries should be the
+    main goal. ''Leave no company''s customers behind'' protects customers, not parity
+    between companies. Reading it as raising the floor (min_company_on_time_rate)
+    is the reading that cannot be satisfied by making a better-served company''s customers
+    worse off. Option 2''s gap metric could reward such levelling down. Option 3 would
+    rank the town-wide count second, which contradicts the KPI''s stated priority.
+    Monitoring unfinished and worst_company_p95_wait_s guards against the proxy problem:
+    optimizing on-time counts could abandon orders that are already late, and those
+    customers would be left behind. I accept the recommended option. No numeric levels
+    are set because the KPI gives none. Regulation revisions remain a process rule:
+    any such proposal goes to the human with an impact statement for A, B, C and the
+    customers.'
+  by: llm
+- id: A1
+  type: assumption
+  text: The same seeds and order stream are used when comparing amendments, so on_time_deliveries
+    and on_time_rate rank amendments the same way.
+  by: llm
+- id: A2
+  type: assumption
+  text: min_company_on_time_rate and worst_company_p95_wait_s are computed per company
+    over that company's customers' orders.
+  by: llm
+- id: A3
+  type: assumption
+  text: '''Leave no company''s customers behind'' is meant to protect customers of
+    the weakest company, not to equalize companies'' performance.'
+  by: llm
+- id: S2
+  type: strategy
+  text: 'Period 1: no change'
+  ref: D1
+  supported_by:
+  - Sn1
+  in_context_of:
+  - C2
+  - J2
+  - A4
+  - A5
+  - A6
+  - A7
+- id: Sn1
+  type: solution
+  text: Measured on the same seeds (p1-evidence.md)
+  file: p1-evidence.md
+- id: C2
+  type: context
+  text: 'Period 1 environment: normal (mean order interval 75 s)'
+- id: J2
+  type: justification
+  text: 'I am deciding for the service operator, who owns the rules, the contract
+    and the reading of the KPI, but not the regulation. Option 1 can only be adopted
+    by revising the voting quorum, which is a regulation-level change for the regulator.
+    Under K1''s process rule it needs an impact statement for A, B, C and the customers.
+    The customer case for option 1 is strong: on-time 121.8 → 131.0 (+9.2, 5/5 seeds),
+    late 10.4 → 1.2, lowest on-time rate 0.84 → 0.98, worst_company_p95_wait_s 273
+    → 95.6. That is why I do not reject it on its merits. But overriding B''s and
+    C''s votes now would set a lasting precedent that weakens every company''s veto
+    on future amendments. Three costs also remain unexplained: C''s utility falls
+    from 28.8 to 19.0 (about a third), B''s from 38.9 to 37.2, and road violations
+    rise from 25.8 to 34.0, with unknown safety relevance for other road users. A
+    one-period measurement on 5 seeds is not enough to justify an irreversible change
+    to voting rights while those costs are not understood. I therefore keep v1 and
+    do not follow the recommendation in this period. The vote result (A for, B and
+    C against) stands. The proper next step is a narrowly scoped quorum-revision proposal
+    sent to the regulator with the impact statement, together with measurement of
+    why C loses and which violations increase. Customers keep the current service
+    level for now; this is the cost of this choice and the reason to revisit it soon.
+    Option 2 (hold_limit) is not a substitute: -1.2 on-time, 2/5 seeds.'
+  by: llm
+- id: A4
+  type: assumption
+  text: The service operator's mandate does not include revising the constitution's
+    voting quorum; that belongs to the regulator.
+  by: llm
+- id: A5
+  type: assumption
+  text: The KPI's allowance for regulation revision, as described in the recommendation,
+    permits a revision but does not oblige the operator to make one immediately.
+  by: llm
+- id: A6
+  type: assumption
+  text: Next period's demand will be similar to this period's, so current-rule metrics
+    stay near their measured values.
+  by: llm
+- id: A7
+  type: assumption
+  text: The rise in road violations under block_k 2 comes from evictions, not from
+    an error in the measurement.
+  by: llm
+- id: S3
+  type: strategy
+  text: 'Period 2: no change'
+  ref: D2
+  supported_by:
+  - Sn2
+  in_context_of:
+  - C3
+  - J3
+  - A8
+  - A9
+  - A10
+  - A11
+- id: Sn2
+  type: solution
+  text: Measured on the same seeds (p2-evidence.md)
+  file: p2-evidence.md
+- id: C3
+  type: context
+  text: 'Period 2 environment: normal + rush (mean order interval 75 s)'
+- id: J3
+  type: justification
+  text: 'I am deciding for the service operator, who does not own the regulation.
+    Option 1 can only be adopted by sending R1 (vote.quorum 2 → 1) to the regulator,
+    and I decline to do that in this period, which follows the recommendation.
+
+
+    The customer case is now confirmed in a second period. On-time rises 216.6 → 223.8
+    (+7.2, 5/5 seeds). Late falls 11.4 → 4.2. The lowest on-time rate rises 0.93 →
+    0.97. worst_company_p95_wait_s falls 158 → 109. Keeping v1 costs customers about
+    7.2 on-time deliveries this period, and I record that cost explicitly.
+
+
+    However, R1 is not the narrowly scoped revision D1 contemplated. It is a blanket
+    quorum of 1. That would let any single company pass any future amendment, and
+    it would remove every company''s veto, A''s included. This is effectively irreversible
+    and could invite strategic amendments.
+
+
+    The costs of option 1 are also still unexplained:
+
+    - C''s utility falls 65.8 → 56.3 (about 14%).
+
+    - B''s utility falls 68.5 → 65.5.
+
+    - Road violations rise 19.0 → 28.0, and their safety relevance for other road
+    users is unknown.
+
+
+    The period-1 re-measurement (F2.D1.f1) only confirmed reproducibility; it did
+    not diagnose these costs. Option 2 is not a substitute: +0.4 on-time, 2/5 seeds,
+    and C voted against it.
+
+
+    This settles D1.f2. A blanket quorum cut (R1 as measured) should not be sent.
+    The operator would support only a revision limited to rule changes that pass check
+    and the constitution and improve every KPI condition on all seeds, sent with an
+    impact statement for A, B, C and the customers. Whether such a scoped instrument
+    can exist is for the regulator.
+
+
+    The vote result (A for, B and C against) stands.'
+  by: llm
+- id: A8
+  type: assumption
+  text: Period-3 demand will resemble periods 1 and 2, so the benefit of block_k 3
+    → 2 persists and the decision can be revisited.
+  by: llm
+- id: A9
+  type: assumption
+  text: The +9.0 road violations under option 1 may include safety-relevant ones;
+    absent evidence, I treat them as a possible risk.
+  by: llm
+- id: A10
+  type: assumption
+  text: R1 as measured applies to all future amendments, not only to proposal 1.
+  by: llm
+- id: A11
+  type: assumption
+  text: Customers' harm from one more period at v1 is bounded (on-time rate floor
+    0.93, unfinished 0.0).
+  by: llm
+- id: S4
+  type: strategy
+  text: 'Period 2: regulation kept'
+  ref: R2
+  supported_by:
+  - Sn3
+  in_context_of:
+  - J4
+  - A12
+  - A13
+  - A14
+- id: Sn3
+  type: solution
+  text: Measured on the same seeds (p2-evidence.md)
+  file: p2-evidence.md
+- id: J4
+  type: justification
+  text: 'I am deciding for the regulator. I keep constitution-v1 with vote.quorum
+    2 and do not follow the LLM''s recommendation. The recommendation was itself conditional:
+    send R1 only if its scope can be bound to proposal 1. That condition is not met.
+    vote.quorum is a single value of the constitution, and the measurement row for
+    R1 shows only that ''the vote on proposal(s) 1 changes''. Nothing measured or
+    written shows an instrument that confines a quorum of 1 to one proposal. In force,
+    a quorum of 1 lets any single company pass any rule amendment and removes every
+    company''s veto, A''s included. That change to the voting structure of the town
+    is hard to reverse.
+
+
+    The customer case is real and I record its cost. Under proposal 1, on-time rises
+    216.6 -> 223.8 (+7.2, 5/5 seeds) and late falls 11.4 -> 4.2. The lowest on-time
+    rate rises 0.93 -> 0.97 and worst_company_p95_wait_s falls 158 -> 109. Keeping
+    v1 means customers forgo about 7.2 on-time deliveries this period, the third period
+    in which this cost is accepted.
+
+
+    Against that gain:
+
+    - Road violations rise 19.0 -> 28.0 (about +47%), and their safety relevance for
+    other road users has not been diagnosed. As regulator I give weight to third parties
+    who have no vote and no KPI.
+
+    - C''s utility falls 65.8 -> 56.3 and B''s 68.5 -> 65.5, for reasons not yet explained.
+
+
+    A regulator should not override two of three companies'' votes through a general
+    rule change while a safety-relevant cost is unexplained. The vote result on proposal
+    1 (A for, B and C against) stands. Proposal 2 also stays rejected on C''s vote;
+    it was not a meaningful gain (+0.4, 2/5 seeds).
+
+
+    This is not a permanent no. I would reconsider a quorum change that is genuinely
+    limited, for example to amendments that pass every KPI condition on all seeds
+    and do not raise road violations, or the same R1 once the violation increase is
+    shown to be harmless.'
+  by: llm
+- id: A12
+  type: assumption
+  text: The constitution has no mechanism to scope a vote.quorum value to a single
+    proposal, so R1 would act as a general quorum of 1 once in force.
+  by: llm
+- id: A13
+  type: assumption
+  text: The constitution check passing for proposal 1 means the existing invariants
+    hold, but it does not show that the extra road violations are harmless.
+  by: llm
+- id: A14
+  type: assumption
+  text: Next period's demand will resemble this period's normal + rush conditions.
+  by: llm
+- id: S5
+  type: strategy
+  text: 'Period 3: no change'
+  ref: D3
+  supported_by:
+  - Sn4
+  in_context_of:
+  - C4
+  - J5
+  - A15
+  - A16
+  - A17
+- id: Sn4
+  type: solution
+  text: Measured on the same seeds (p3-evidence.md)
+  file: p3-evidence.md
+- id: C4
+  type: context
+  text: 'Period 3 environment: busy (mean order interval 45 s)'
+- id: J5
+  type: justification
+  text: 'I am deciding for the service operator, who owns the rules, the contract
+    and the KPI reading, but not the regulation. I follow the recommendation. Option
+    1 passed check and the constitution, but B and C voted against it, so it is blocked
+    1-2. The only override is a quorum change, which D2 and R2 declined.
+
+
+    The evidence is weaker than in earlier periods, not stronger. On-time rises 213.6
+    -> 219.4 (+5.8), but only 3/5 seeds improved, against 5/5 in periods 1 and 2.
+    Road violations rise 24.2 -> 34.8 and still have no by-cause breakdown, so R2''s
+    open question (are they harmless enforcement evictions?) is unanswered. R2''s
+    reconsideration condition (every KPI condition on all seeds and no rise in road
+    violations) is not met. C''s loss (58.3 -> 46.9, about 20%) and B''s loss (69.6
+    -> 62.5) remain unexplained.
+
+
+    The customer cost of keeping v1 is real, and I record it for the fourth period.
+    Customers forgo about 5.8 on-time deliveries, keep late deliveries at 9.2 instead
+    of 3.4, and the worst-served company''s customers wait p95 154 instead of 95.4.
+
+
+    On D2.f1: its premise (improvement on all seeds) did not hold this period. So
+    no, the operator will not ask the regulator for a scoped quorum revision now.
+
+
+    On K1.d.f1: on_time_deliveries remains the main goal. min_company_on_time_rate
+    and worst_company_p95_wait_s act as guards. An amendment that raises on-time but
+    lowers the floor or raises the worst p95 does not count as a KPI improvement;
+    it goes to the human with an impact statement for the customers of the worse-served
+    company. No numeric per-company floor is set, because the KPI gives no number.
+    Option 1 does not trigger this conflict, since it improves both guards.
+
+
+    The vote result (A for, B and C against) stands.'
+  by: llm
+- id: A15
+  type: assumption
+  text: The period-3 measurement on 5 seeds is representative of busy-period conditions.
+  by: llm
+- id: A16
+  type: assumption
+  text: B's and C's votes reflect their utility losses under option 1 and would not
+    change without a modified proposal.
+  by: llm
+- id: A17
+  type: assumption
+  text: The rise in road violations under option 1 may include safety-relevant events
+    for other road users until shown otherwise.
+  by: llm
+- id: S6
+  type: strategy
+  text: 'Period 4: no change'
+  ref: D4
+  supported_by:
+  - Sn5
+  in_context_of:
+  - C5
+  - J6
+  - A18
+  - A19
+  - A20
+- id: Sn5
+  type: solution
+  text: Measured on the same seeds (p4-evidence.md)
+  file: p4-evidence.md
+- id: C5
+  type: context
+  text: 'Period 4 environment: busy + rush (mean order interval 45 s)'
+- id: J6
+  type: justification
+  text: 'I am deciding for the service operator, who owns the rules, the contract
+    and the KPI reading but not the regulation. I follow the recommendation and keep
+    v1.
+
+
+    Proposal 1 passed check and the constitution and has a strong customer case:
+
+    - On-time rises 264.6 -> 272.6 (+8.0, 5/5 seeds).
+
+    - Late falls 10.0 -> 2.0.
+
+    - The lowest on-time rate rises 0.93 -> 0.98.
+
+    - worst_company_p95_wait_s falls 138 -> 98.2.
+
+
+    However, B and C voted against it, so it is blocked 1-2. The only override is
+    a quorum change. That is a regulation decision, and D2, R2 and D3 declined it.
+    R2''s condition for reconsidering is not met. Road violations rise again, 20.4
+    -> 29.6 (about +45%), and there is still no evidence that they are harmless to
+    other road users. C''s loss (77.7 -> 68.8, about 11%) and B''s loss (80.3 -> 76.0)
+    remain unexplained.
+
+
+    I record the customer cost for the fifth period. Customers forgo about 8.0 on-time
+    deliveries and keep 10.0 late deliveries instead of 2.0. The worst-served company''s
+    customers wait p95 138 instead of 98.2.
+
+
+    On D3.f2: block_k 3 -> 2 has now raised road violations in all four measured periods
+    (25.8->34.0, 19.0->28.0, 24.2->34.8, 20.4->29.6), and B and C have rejected it
+    every time. Bringing it back unchanged will not change their votes or meet R2''s
+    condition. So yes: the operator stops reconsidering block_k 3 -> 2 in its current
+    form. The proposer should look for a different single-parameter change that B
+    and C can accept and that does not raise road violations. block_k 2 may return
+    only if the regulator rules on R2.f1 in its favour.
+
+
+    R2.f1 is the regulator''s question, and I do not settle it here. The vote result
+    (A for, B and C against) stands.'
+  by: llm
+- id: A18
+  type: assumption
+  text: The period-4 measurement on 5 seeds is representative of the gains and costs
+    of block_k 2 under busy + rush demand.
+  by: llm
+- id: A19
+  type: assumption
+  text: The rise in road violations under block_k 2 has the same cause as in earlier
+    periods and is not harmless by default.
+  by: llm
+- id: A20
+  type: assumption
+  text: B and C will keep voting against block_k 2 as long as their utility falls.
+  by: llm
+- id: S7
+  type: strategy
+  text: 'Period 4: answered the promised questions R2.f1'
+  ref: QR4
+  in_context_of:
+  - J7
+  - A21
+  - A22
+  - A23
+- id: J7
+  type: justification
+  text: 'I am deciding for the regulator. The only option is keep, and this decision
+    answers R2.f1.
+
+
+    Answer to R2.f1, part 1 (scoped quorum): In principle, yes. The regulator would
+    accept a quorum revision confined to amendments that pass every KPI condition
+    on all seeds and do not increase road violations. Such a rule would let customers
+    gain without imposing an unexamined cost on third parties.
+
+
+    Answer to R2.f1, part 2 (can the scope be written): Not with the instrument that
+    exists today. vote.quorum is a single value of the constitution. A change to it
+    applies to every future amendment, and nothing measured or written so far shows
+    a way to condition it on measured outcomes. An amendment of the constitution also
+    moves one parameter by one step. A conditional quorum would need a new kind of
+    constitutional clause, and that is outside what can be proposed or measured now.
+
+
+    The question is also moot for the candidate in hand. block_k 3 -> 2 has raised
+    road violations in every measured period:
+
+    - 25.8->34.0
+
+    - 19.0->28.0
+
+    - 24.2->34.8
+
+    - 20.4->29.6
+
+    In period 3 it improved only 3/5 seeds. It would not qualify under the scoped
+    rule even if that rule existed.
+
+
+    Answer to R2.f1, part 3 (accept block_k 2 once its violations are shown harmless):
+    Not now. No by-cause breakdown of the violation increase exists, and none is scheduled
+    by anyone in the town. Harmlessness therefore cannot be shown. Even if it were
+    shown, the remaining override path is a blanket quorum cut. That would remove
+    every company''s veto on all future amendments in order to pass one rule that
+    B and C have rejected four times. Their utility losses are also unexplained:
+
+    - C: 77.7 -> 68.8 in period 4.
+
+    - B: 80.3 -> 76.0.
+
+    I do not accept that trade.
+
+
+    I record the customer cost. In period 4, customers forgo about 8.0 on-time deliveries
+    (264.6 vs 272.6) and keep 10.0 late deliveries instead of 2.0.
+
+
+    The regulator agrees with D4: the better route is a different single-parameter
+    rule change that B and C can vote for and that does not raise road violations.
+    constitution-v1 with vote.quorum 2 stays in force, and the vote results stand.'
+  by: llm
+- id: A21
+  type: assumption
+  text: vote.quorum is a single scalar in constitution.yaml and cannot be conditioned
+    on measured outcomes with the current amendment format.
+  by: llm
+- id: A22
+  type: assumption
+  text: Nobody in the town is scheduled to produce a by-cause breakdown of road violations,
+    so harmlessness cannot be demonstrated soon.
+  by: llm
+- id: A23
+  type: assumption
+  text: The period-4 baseline is reproducible, as the earlier re-measurements were.
+  by: llm
+- id: S8
+  type: strategy
+  text: 'Period 5: v2 sanction_lambda 0.5 → 1 (rule, main goal +7.8, yes: AB)'
+  ref: D5
+  supported_by:
+  - Sn6
+  in_context_of:
+  - C6
+  - J8
+- id: Sn6
+  type: solution
+  text: Measured on the same seeds (p5-evidence.md)
+  file: p5-evidence.md
+- id: C6
+  type: context
+  text: 'Period 5 environment: quiet (mean order interval 120 s)'
+- id: J8
+  type: justification
+  text: Passed every gate and raised no reason to ask the human
+  by: tool
+- id: S9
+  type: strategy
+  text: 'Period 6: no change'
+  ref: D6
+  supported_by:
+  - Sn7
+  in_context_of:
+  - C7
+  - J9
+- id: Sn7
+  type: solution
+  text: Measured on the same seeds (p6-evidence.md)
+  file: p6-evidence.md
+- id: C7
+  type: context
+  text: 'Period 6 environment: quiet (mean order interval 120 s)'
+- id: J9
+  type: justification
+  text: Nothing could be adopted and nothing raised a reason to ask
+  by: tool

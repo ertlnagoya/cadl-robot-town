@@ -1,156 +1,122 @@
 {
-  "note": "claude-opus-5-5、入力 7950 / 出力 11565 トークン",
-  "request_digest": "df56088b593fa8aa",
+  "note": "claude-opus-5-5、入力 7908 / 出力 8469 トークン",
+  "request_digest": "2720d6d5087fc246",
   "data": {
-    "assessment": "The town delivered 121.8 of 132.2 orders on time (0.92) with nothing left unfinished. The main loss is 7.8 late pickups, almost all at company A (on-time 0.84). A never parks on the road, yet it was blocked for 1352 of the 2404 blocked seconds, mostly by robots from B and C that wait at the central node (about 38–40 road waits each, 23 hold-limit overstays). Blocking by parked robots is therefore the most likely cause of the lost on-time deliveries; the current SLA is mostly kept, so tightening road use comes before loosening promises.",
+    "assessment": "On-time deliveries are 121.8 of 132.2 orders (0.92), with no unfinished orders. The 10.4 late deliveries come mostly from pickup deadline misses (7.8 of them, matching A's 7.8 lates), and A, which never waits on the road, loses 1352 s to being blocked. B and C park on the road about 38–40 times each. C draws most of the release-deadline sanctions (penalty 14.8), but its parking costs the other companies, A above all, their on-time pickups.",
     "proposals": [
       {
-        "title": "Lower blocking_guard threshold block_k from 3 to 2",
-        "rationale": "Blocking is concentrated on A (1352 s), which has the lowest on-time rate and most of the 7.8 late pickups, while blocking_guard fired only 2.8 times at k=3. Evicting a parked robot once 2 robots wait behind it should cut blocked_s and turn some of A's late pickups into on-time deliveries, raising on_time_deliveries without loosening any promise. A should vote yes because it never parks and so pays no penalty. C, and possibly B, may lose utility from extra Major eviction penalties, so passage likely depends on B's on-time gain offsetting its small penalty increase.",
+        "title": "Evict road-parked robots sooner: block_k 3 -> 2",
+        "rationale": "A's lateness (7.8 pickup misses) follows its 1352 s of blocked time, while blocking_guard evicted only 2.8 times at a threshold of 3 waiting robots. Lowering the threshold to 2 should clear the central intersection sooner, which should cut blocked_s and raise A's on-time count and the town on-time count, with no change to the customer promise. A should vote yes. C will probably vote no because its eviction penalties rise. B is uncertain: it gains from less blocking but also parks on the road.",
         "cadl": "# =====================================================================\n# robot_town.cadl ─── ロボットの街：3 社の配送ロボットが道路を共有する\n#\n# 道路網はラズパイマウスのシミュレータと同じ 11 ノード・17 エッジ。\n# 3 社（A / B / C）が 2 台ずつロボットを走らせ、ノードは 1 台ずつしか\n# 使えない。仕事のないロボットは車庫に戻るか、道路上（中央の交差点 8）\n# に止まって次の注文を待つ。止まったロボットは他社の通行をふさぐ。\n#\n# `# @amend:<名前>` が付いた行は、改正してよいパラメータ。どの層（規則・\n# 契約）に属し、どこまで動かしてよいかは constitution.yaml が決める。\n# 委員会（COUNCIL）が自分で改正できるのは規則の層だけで、契約の層を\n# 変えるには人間の判断が要る。\n# =====================================================================\n\nsos:\n  name: \"RobotTown\"\n  type: Collaborative             # 独立した 3 社が共通の規則を決める\n  version: \"1.0.0\"\n\n  context:\n    environment:\n      num_robots:   6\n      num_companies: 3\n      time_step_ms: 1000\n\n  actors:\n    - id: TOWN_STEWARD\n      role: \"road_steward\"\n      autonomy: low\n      capabilities: [assign_order, record_violation, evict]\n      interface:\n        input:  [order_request, position_report, node_released, rule_update]\n        output: [order_assignment, eviction_notice, regime_notice, violation_report]\n\n    - id: \"ROBOT[1..N]\"\n      role: \"delivery_robot\"\n      autonomy: high\n      capabilities: [move, park, pickup, dropoff]\n      interface:\n        input:  [order_assignment, eviction_notice, regime_notice, amendment_proposal]\n        output: [position_report, node_released, ballot]\n\n    - id: COUNCIL\n      role: \"rule_amendment_body\"\n      autonomy: medium\n      capabilities: [propose_amendment, tally_ballots]\n      interface:\n        input:  [violation_report, ballot]\n        output: [amendment_proposal, rule_update]\n\n  contracts:\n    # ── 顧客への約束：注文 1 件ごとのインスタンス（契約の層。人間が決める） ──\n    - id: DELIVERY_SLA\n      parties: [TOWN_STEWARD, \"ROBOT[*]\"]\n      guarantee:\n        - \"pickup_time <= 120s\"         # @amend:pickup_deadline\n        - \"dropoff_time <= 120s\"        # @amend:dropoff_deadline\n      lifecycle:\n        states: [Assigned, PickedUp, Delivered, Late]\n        initial: Assigned\n        terminal: [Delivered, Late]\n        transitions:\n          - id: pickup\n            from: Assigned\n            to:   PickedUp\n            on:   \"ROBOT[i].status == PickedUp\"\n            deadline: 120s            # @amend:pickup_deadline\n            on_violation: { transition: Late, severity: Major }\n          - id: dropoff\n            from: PickedUp\n            to:   Delivered\n            on:   \"ROBOT[i].status == Delivered\"\n            deadline: 120s            # @amend:dropoff_deadline\n            on_violation: { transition: Late, severity: Major }\n\n    # ── 道路の使い方：道路上に止まるたびに 1 インスタンス ──\n    - id: ROAD_USE\n      parties: [TOWN_STEWARD, \"ROBOT[*]\", COUNCIL]\n      guarantee:\n        - \"hold_time <= hold_limit\"\n      authority:\n        decision_holder: COUNCIL\n        beta: 0.5\n        mode: \"collective\"\n      information:\n        alpha: 1.0                    # 規則と違反記録は全社に公開\n      incentives:\n        type: sanction\n        lambda: 0.5                   # @amend:sanction_lambda\n        rules:\n          - \"penalty(ROBOT[i], lambda) when overstay\"\n      lifecycle:\n        states: [Holding, Overstay, Released, Evicted]\n        initial: Holding\n        terminal: [Released, Evicted]\n        transitions:\n          - id: release\n            from: [Holding, Overstay]\n            to:   Released\n            on:   \"ROBOT[i] -> TOWN_STEWARD : node_released\"\n            deadline: 60s             # @amend:hold_limit\n            on_violation: { transition: Overstay, severity: Minor }\n      monitors:\n        - id: blocking_guard\n          observe: \"ROBOT[i].blocking\"\n          sampling: periodic(1000ms)\n          rule: \"ROBOT.blocking >= 2 AND state IN [Holding, Overstay]\"  # @amend:block_k\n          on_match: { transition: Evicted, severity: Major }\n\n  # ── 運用モード：分散（各社が道路上で待つ）⇄ 集中（管理者が待避所を割り当てる） ──\n  # 条件は 5 分ごとに、直前 5 分の観測で判定する。\n  #   orders_in_window : 3 社の注文の合計件数\n  #   blocked_pct      : ロボットが止まっているロボットにふさがれていた時間の割合（%）\n  # 集中管理は交差点をふさがれない反面、エッジを 1 台ずつ割り当てるので、\n  # 注文が非常に多いと許可待ちが積み重なる。そのときだけ分散に戻す。\n  transitions:\n    - from: DISTRIBUTED\n      to: CENTRALIZED\n      condition: \"orders_in_window < 22\"      # @amend:to_central\n      protocol: SWITCH\n      safety_invariant: \"robots_on_road == 0\"\n    - from: CENTRALIZED\n      to: DISTRIBUTED\n      condition: \"orders_in_window >= 26\"     # @amend:to_distributed\n      protocol: SWITCH\n\n  protocols:\n    - id: SWITCH\n      trigger: \"regime_condition_holds\"\n      steps:\n        - \"TOWN_STEWARD -> ROBOT[*] : regime_notice\"\n        - \"ROBOT[*] -> TOWN_STEWARD : node_released\"\n        - \"TOWN_STEWARD : activate_regime\"\n    - id: AMEND\n      trigger: \"period_end\"\n      steps:\n        - \"TOWN_STEWARD -> COUNCIL : violation_report\"\n        - \"COUNCIL -> ROBOT[*] : amendment_proposal\"\n        - \"ROBOT[*] -> COUNCIL : ballot\"\n        - \"COUNCIL : tally_ballots\"\n        - \"COUNCIL -> TOWN_STEWARD : rule_update\"\n\n  metrics:\n    - id: on_time_deliveries\n      formula: \"count(Delivered)\"\n      target: \">= 0.9 * count(orders)\"\n    - id: blocked_time\n      formula: \"sum(blocked_robot_seconds)\"\n      target: \"<= 600s\"\n",
         "needs_human": false,
         "why_human": "",
         "assumptions": [
-          "Most of A's blocked time comes from B/C robots parked at the central node, not from moving traffic.",
-          "An eviction frees the node quickly enough to shorten A's trips to pickup."
+          "A's pickup misses are caused mainly by being blocked at the central intersection by B/C robots parked there.",
+          "Eviction physically frees the node rather than only adding a penalty.",
+          "Companies vote on their own utility (on-time count minus penalties) as the constitution states."
         ],
         "unknowns": [
-          "Whether evicted robots then travel further to their next pickup, which would add delay for B and C.",
-          "How many extra Major eviction penalties B and C would incur at k=2."
+          "Whether more frequent evictions send B/C robots on longer trips to their garages, which would delay their own pickups.",
+          "Whether B's gain from less blocking outweighs its extra eviction penalties, which decides whether the vote reaches quorum.",
+          "Whether the improvement reaches the 1.0 min_improvement threshold."
         ],
         "predictions": [
           {
             "subject": "metric:blocked_s",
             "expected": "decrease",
-            "note": "Parked robots are evicted earlier."
+            "note": "Parked robots are evicted when 2 robots wait behind them instead of 3."
           },
           {
             "subject": "metric:on_time_deliveries",
             "expected": "increase",
-            "note": "Mainly fewer late pickups at A."
+            "note": "Mainly through fewer pickup misses at A."
+          },
+          {
+            "subject": "metric:late_deliveries@A",
+            "expected": "decrease",
+            "note": "A is the most blocked company."
+          },
+          {
+            "subject": "metric:sanction_total",
+            "expected": "increase",
+            "note": "Evictions are Major violations."
           },
           {
             "subject": "metric:p95_wait_s",
             "expected": "decrease",
-            "note": "Less time lost waiting behind parked robots."
-          },
-          {
-            "subject": "metric:sanction_total",
-            "expected": "increase",
-            "note": "More Major eviction penalties."
+            "note": "Less blocking shortens order-to-delivery times."
           },
           {
             "subject": "vote:A",
             "expected": "yes",
-            "note": "A gains on-time deliveries and pays no penalties."
-          },
-          {
-            "subject": "vote:C",
-            "expected": "no",
-            "note": "C parks most and would absorb most of the new eviction penalties."
+            "note": "A pays no penalties and gains on-time deliveries."
           },
           {
             "subject": "vote:B",
             "expected": "yes",
-            "note": "Uncertain; B is also blocked 849 s and may gain more on-time deliveries than it loses to penalties."
-          }
-        ]
-      },
-      {
-        "title": "Raise sanction_lambda from 0.5 to 1.0",
-        "rationale": "There were 23 hold-limit overstays, mostly by B and C, at a low penalty weight, and A paid for them with 1352 blocked seconds. A higher penalty may lead robots to park less or release sooner, which would reduce blocking and raise on_time_deliveries. A would vote yes. B and C would see higher penalties and will likely vote no unless their behaviour changes, so this is a weaker alternative to the block_k change.",
-        "cadl": "# =====================================================================\n# robot_town.cadl ─── ロボットの街：3 社の配送ロボットが道路を共有する\n#\n# 道路網はラズパイマウスのシミュレータと同じ 11 ノード・17 エッジ。\n# 3 社（A / B / C）が 2 台ずつロボットを走らせ、ノードは 1 台ずつしか\n# 使えない。仕事のないロボットは車庫に戻るか、道路上（中央の交差点 8）\n# に止まって次の注文を待つ。止まったロボットは他社の通行をふさぐ。\n#\n# `# @amend:<名前>` が付いた行は、改正してよいパラメータ。どの層（規則・\n# 契約）に属し、どこまで動かしてよいかは constitution.yaml が決める。\n# 委員会（COUNCIL）が自分で改正できるのは規則の層だけで、契約の層を\n# 変えるには人間の判断が要る。\n# =====================================================================\n\nsos:\n  name: \"RobotTown\"\n  type: Collaborative             # 独立した 3 社が共通の規則を決める\n  version: \"1.0.0\"\n\n  context:\n    environment:\n      num_robots:   6\n      num_companies: 3\n      time_step_ms: 1000\n\n  actors:\n    - id: TOWN_STEWARD\n      role: \"road_steward\"\n      autonomy: low\n      capabilities: [assign_order, record_violation, evict]\n      interface:\n        input:  [order_request, position_report, node_released, rule_update]\n        output: [order_assignment, eviction_notice, regime_notice, violation_report]\n\n    - id: \"ROBOT[1..N]\"\n      role: \"delivery_robot\"\n      autonomy: high\n      capabilities: [move, park, pickup, dropoff]\n      interface:\n        input:  [order_assignment, eviction_notice, regime_notice, amendment_proposal]\n        output: [position_report, node_released, ballot]\n\n    - id: COUNCIL\n      role: \"rule_amendment_body\"\n      autonomy: medium\n      capabilities: [propose_amendment, tally_ballots]\n      interface:\n        input:  [violation_report, ballot]\n        output: [amendment_proposal, rule_update]\n\n  contracts:\n    # ── 顧客への約束：注文 1 件ごとのインスタンス（契約の層。人間が決める） ──\n    - id: DELIVERY_SLA\n      parties: [TOWN_STEWARD, \"ROBOT[*]\"]\n      guarantee:\n        - \"pickup_time <= 120s\"         # @amend:pickup_deadline\n        - \"dropoff_time <= 120s\"        # @amend:dropoff_deadline\n      lifecycle:\n        states: [Assigned, PickedUp, Delivered, Late]\n        initial: Assigned\n        terminal: [Delivered, Late]\n        transitions:\n          - id: pickup\n            from: Assigned\n            to:   PickedUp\n            on:   \"ROBOT[i].status == PickedUp\"\n            deadline: 120s            # @amend:pickup_deadline\n            on_violation: { transition: Late, severity: Major }\n          - id: dropoff\n            from: PickedUp\n            to:   Delivered\n            on:   \"ROBOT[i].status == Delivered\"\n            deadline: 120s            # @amend:dropoff_deadline\n            on_violation: { transition: Late, severity: Major }\n\n    # ── 道路の使い方：道路上に止まるたびに 1 インスタンス ──\n    - id: ROAD_USE\n      parties: [TOWN_STEWARD, \"ROBOT[*]\", COUNCIL]\n      guarantee:\n        - \"hold_time <= hold_limit\"\n      authority:\n        decision_holder: COUNCIL\n        beta: 0.5\n        mode: \"collective\"\n      information:\n        alpha: 1.0                    # 規則と違反記録は全社に公開\n      incentives:\n        type: sanction\n        lambda: 1.0                   # @amend:sanction_lambda\n        rules:\n          - \"penalty(ROBOT[i], lambda) when overstay\"\n      lifecycle:\n        states: [Holding, Overstay, Released, Evicted]\n        initial: Holding\n        terminal: [Released, Evicted]\n        transitions:\n          - id: release\n            from: [Holding, Overstay]\n            to:   Released\n            on:   \"ROBOT[i] -> TOWN_STEWARD : node_released\"\n            deadline: 60s             # @amend:hold_limit\n            on_violation: { transition: Overstay, severity: Minor }\n      monitors:\n        - id: blocking_guard\n          observe: \"ROBOT[i].blocking\"\n          sampling: periodic(1000ms)\n          rule: \"ROBOT.blocking >= 3 AND state IN [Holding, Overstay]\"  # @amend:block_k\n          on_match: { transition: Evicted, severity: Major }\n\n  # ── 運用モード：分散（各社が道路上で待つ）⇄ 集中（管理者が待避所を割り当てる） ──\n  # 条件は 5 分ごとに、直前 5 分の観測で判定する。\n  #   orders_in_window : 3 社の注文の合計件数\n  #   blocked_pct      : ロボットが止まっているロボットにふさがれていた時間の割合（%）\n  # 集中管理は交差点をふさがれない反面、エッジを 1 台ずつ割り当てるので、\n  # 注文が非常に多いと許可待ちが積み重なる。そのときだけ分散に戻す。\n  transitions:\n    - from: DISTRIBUTED\n      to: CENTRALIZED\n      condition: \"orders_in_window < 22\"      # @amend:to_central\n      protocol: SWITCH\n      safety_invariant: \"robots_on_road == 0\"\n    - from: CENTRALIZED\n      to: DISTRIBUTED\n      condition: \"orders_in_window >= 26\"     # @amend:to_distributed\n      protocol: SWITCH\n\n  protocols:\n    - id: SWITCH\n      trigger: \"regime_condition_holds\"\n      steps:\n        - \"TOWN_STEWARD -> ROBOT[*] : regime_notice\"\n        - \"ROBOT[*] -> TOWN_STEWARD : node_released\"\n        - \"TOWN_STEWARD : activate_regime\"\n    - id: AMEND\n      trigger: \"period_end\"\n      steps:\n        - \"TOWN_STEWARD -> COUNCIL : violation_report\"\n        - \"COUNCIL -> ROBOT[*] : amendment_proposal\"\n        - \"ROBOT[*] -> COUNCIL : ballot\"\n        - \"COUNCIL : tally_ballots\"\n        - \"COUNCIL -> TOWN_STEWARD : rule_update\"\n\n  metrics:\n    - id: on_time_deliveries\n      formula: \"count(Delivered)\"\n      target: \">= 0.9 * count(orders)\"\n    - id: blocked_time\n      formula: \"sum(blocked_robot_seconds)\"\n      target: \"<= 600s\"\n",
-        "needs_human": false,
-        "why_human": "",
-        "assumptions": [
-          "Robots' parking decisions respond to the penalty weight.",
-          "Overstays by B and C are the main source of A's blocked time."
-        ],
-        "unknowns": [
-          "Whether robot policies take lambda into account at all; if not, this change only raises penalties."
-        ],
-        "predictions": [
-          {
-            "subject": "metric:blocked_s",
-            "expected": "decrease",
-            "note": "Only if robots park less in response to higher penalties."
-          },
-          {
-            "subject": "metric:on_time_deliveries",
-            "expected": "increase",
-            "note": "Small gain, mainly for A, if blocking falls."
-          },
-          {
-            "subject": "metric:sanction_total",
-            "expected": "increase",
-            "note": "The penalty weight doubles."
-          },
-          {
-            "subject": "vote:A",
-            "expected": "yes",
-            "note": "No penalties for A and possibly fewer blocks."
-          },
-          {
-            "subject": "vote:B",
-            "expected": "no",
-            "note": "Its penalty doubles from 0.9 with an uncertain on-time gain."
+            "note": "Uncertain; B is blocked 849 s but also parks on the road 38 times."
           },
           {
             "subject": "vote:C",
             "expected": "no",
-            "note": "Its penalty roughly doubles from 14.8."
+            "note": "C bears most of the added eviction penalties."
           }
         ]
       },
       {
-        "title": "Contract: loosen pickup_deadline from 120 s to 150 s",
-        "rationale": "Late pickups (7.8 per period, mostly A) are the largest cause of late deliveries, so a 150 s pickup promise would likely turn several of them into on-time deliveries without changing what robots actually do. That would raise on_time_deliveries, while p95_wait_s, max_wait_s and unfinished should stay unchanged because they do not depend on the SLA. This is offered as a fallback for the human in case the rule changes do not fix A's late pickups. It is a promise that is worse for customers, so the human should decide only after the measured wait-time monitors are reviewed. Companies should all vote yes, since their on-time counts can only rise.",
+        "title": "Relax the pickup promise: pickup_deadline 120 s -> 150 s (contract)",
+        "rationale": "Pickup deadline misses (7.8) cause three quarters of the 10.4 late deliveries, almost all at A, which has the lowest on-time rate (0.84). Allowing 150 s from order to pickup should turn most of these near-misses into on-time deliveries, raising on_time_deliveries and A's rate. The SLA-independent p95_wait_s (188 s) and unfinished (0) should not change, so customers would not wait longer, but they would receive a weaker promise. All three companies should vote yes because no one's utility falls.",
         "cadl": "# =====================================================================\n# robot_town.cadl ─── ロボットの街：3 社の配送ロボットが道路を共有する\n#\n# 道路網はラズパイマウスのシミュレータと同じ 11 ノード・17 エッジ。\n# 3 社（A / B / C）が 2 台ずつロボットを走らせ、ノードは 1 台ずつしか\n# 使えない。仕事のないロボットは車庫に戻るか、道路上（中央の交差点 8）\n# に止まって次の注文を待つ。止まったロボットは他社の通行をふさぐ。\n#\n# `# @amend:<名前>` が付いた行は、改正してよいパラメータ。どの層（規則・\n# 契約）に属し、どこまで動かしてよいかは constitution.yaml が決める。\n# 委員会（COUNCIL）が自分で改正できるのは規則の層だけで、契約の層を\n# 変えるには人間の判断が要る。\n# =====================================================================\n\nsos:\n  name: \"RobotTown\"\n  type: Collaborative             # 独立した 3 社が共通の規則を決める\n  version: \"1.0.0\"\n\n  context:\n    environment:\n      num_robots:   6\n      num_companies: 3\n      time_step_ms: 1000\n\n  actors:\n    - id: TOWN_STEWARD\n      role: \"road_steward\"\n      autonomy: low\n      capabilities: [assign_order, record_violation, evict]\n      interface:\n        input:  [order_request, position_report, node_released, rule_update]\n        output: [order_assignment, eviction_notice, regime_notice, violation_report]\n\n    - id: \"ROBOT[1..N]\"\n      role: \"delivery_robot\"\n      autonomy: high\n      capabilities: [move, park, pickup, dropoff]\n      interface:\n        input:  [order_assignment, eviction_notice, regime_notice, amendment_proposal]\n        output: [position_report, node_released, ballot]\n\n    - id: COUNCIL\n      role: \"rule_amendment_body\"\n      autonomy: medium\n      capabilities: [propose_amendment, tally_ballots]\n      interface:\n        input:  [violation_report, ballot]\n        output: [amendment_proposal, rule_update]\n\n  contracts:\n    # ── 顧客への約束：注文 1 件ごとのインスタンス（契約の層。人間が決める） ──\n    - id: DELIVERY_SLA\n      parties: [TOWN_STEWARD, \"ROBOT[*]\"]\n      guarantee:\n        - \"pickup_time <= 150s\"         # @amend:pickup_deadline\n        - \"dropoff_time <= 120s\"        # @amend:dropoff_deadline\n      lifecycle:\n        states: [Assigned, PickedUp, Delivered, Late]\n        initial: Assigned\n        terminal: [Delivered, Late]\n        transitions:\n          - id: pickup\n            from: Assigned\n            to:   PickedUp\n            on:   \"ROBOT[i].status == PickedUp\"\n            deadline: 150s            # @amend:pickup_deadline\n            on_violation: { transition: Late, severity: Major }\n          - id: dropoff\n            from: PickedUp\n            to:   Delivered\n            on:   \"ROBOT[i].status == Delivered\"\n            deadline: 120s            # @amend:dropoff_deadline\n            on_violation: { transition: Late, severity: Major }\n\n    # ── 道路の使い方：道路上に止まるたびに 1 インスタンス ──\n    - id: ROAD_USE\n      parties: [TOWN_STEWARD, \"ROBOT[*]\", COUNCIL]\n      guarantee:\n        - \"hold_time <= hold_limit\"\n      authority:\n        decision_holder: COUNCIL\n        beta: 0.5\n        mode: \"collective\"\n      information:\n        alpha: 1.0                    # 規則と違反記録は全社に公開\n      incentives:\n        type: sanction\n        lambda: 0.5                   # @amend:sanction_lambda\n        rules:\n          - \"penalty(ROBOT[i], lambda) when overstay\"\n      lifecycle:\n        states: [Holding, Overstay, Released, Evicted]\n        initial: Holding\n        terminal: [Released, Evicted]\n        transitions:\n          - id: release\n            from: [Holding, Overstay]\n            to:   Released\n            on:   \"ROBOT[i] -> TOWN_STEWARD : node_released\"\n            deadline: 60s             # @amend:hold_limit\n            on_violation: { transition: Overstay, severity: Minor }\n      monitors:\n        - id: blocking_guard\n          observe: \"ROBOT[i].blocking\"\n          sampling: periodic(1000ms)\n          rule: \"ROBOT.blocking >= 3 AND state IN [Holding, Overstay]\"  # @amend:block_k\n          on_match: { transition: Evicted, severity: Major }\n\n  # ── 運用モード：分散（各社が道路上で待つ）⇄ 集中（管理者が待避所を割り当てる） ──\n  # 条件は 5 分ごとに、直前 5 分の観測で判定する。\n  #   orders_in_window : 3 社の注文の合計件数\n  #   blocked_pct      : ロボットが止まっているロボットにふさがれていた時間の割合（%）\n  # 集中管理は交差点をふさがれない反面、エッジを 1 台ずつ割り当てるので、\n  # 注文が非常に多いと許可待ちが積み重なる。そのときだけ分散に戻す。\n  transitions:\n    - from: DISTRIBUTED\n      to: CENTRALIZED\n      condition: \"orders_in_window < 22\"      # @amend:to_central\n      protocol: SWITCH\n      safety_invariant: \"robots_on_road == 0\"\n    - from: CENTRALIZED\n      to: DISTRIBUTED\n      condition: \"orders_in_window >= 26\"     # @amend:to_distributed\n      protocol: SWITCH\n\n  protocols:\n    - id: SWITCH\n      trigger: \"regime_condition_holds\"\n      steps:\n        - \"TOWN_STEWARD -> ROBOT[*] : regime_notice\"\n        - \"ROBOT[*] -> TOWN_STEWARD : node_released\"\n        - \"TOWN_STEWARD : activate_regime\"\n    - id: AMEND\n      trigger: \"period_end\"\n      steps:\n        - \"TOWN_STEWARD -> COUNCIL : violation_report\"\n        - \"COUNCIL -> ROBOT[*] : amendment_proposal\"\n        - \"ROBOT[*] -> COUNCIL : ballot\"\n        - \"COUNCIL : tally_ballots\"\n        - \"COUNCIL -> TOWN_STEWARD : rule_update\"\n\n  metrics:\n    - id: on_time_deliveries\n      formula: \"count(Delivered)\"\n      target: \">= 0.9 * count(orders)\"\n    - id: blocked_time\n      formula: \"sum(blocked_robot_seconds)\"\n      target: \"<= 600s\"\n",
         "needs_human": true,
-        "why_human": "This is a contract change that loosens the promise made to customers, who do not vote. The KPI requires the human to accept it only after seeing its measured effect on p95_wait_s, max_wait_s and unfinished. The human may also prefer to try the rule changes against blocking first.",
+        "why_human": "This changes the customer contract (DELIVERY_SLA), and customers do not vote. It weakens the pickup promise by 30 s. Per K1, the human must weigh the measured customer impact (p95_wait_s, max_wait_s, unfinished) against the gain in on-time count. The physical fix to blocking (block_k) may be preferable to loosening the promise first.",
         "assumptions": [
-          "Robot behaviour does not depend on the pickup deadline, so actual wait times do not change.",
-          "Most late pickups take between 120 and 150 s."
+          "Most of A's pickup misses fall within 30 s of the current 120 s deadline.",
+          "Robot dispatch behavior does not slow down when given a looser deadline, so actual waits stay the same."
         ],
         "unknowns": [
-          "The distribution of pickup times above 120 s.",
-          "Whether customers value the 120 s promise more than the gain in kept promises."
+          "The distribution of actual pickup times above 120 s; misses beyond 150 s remain late.",
+          "Whether customers value the 120 s promise more than a higher on-time count."
         ],
         "predictions": [
           {
             "subject": "metric:on_time_deliveries",
             "expected": "increase",
-            "note": "Late pickups between 120 and 150 s become on time."
+            "note": "Pickups that took 120–150 s become on time."
+          },
+          {
+            "subject": "metric:late_deliveries",
+            "expected": "decrease",
+            "note": "Pickup misses make up 7.8 of the 10.4 late deliveries."
           },
           {
             "subject": "metric:p95_wait_s",
             "expected": "unchanged",
-            "note": "This is an SLA-independent measure and behaviour should not change."
-          },
-          {
-            "subject": "metric:max_wait_s",
-            "expected": "unchanged",
-            "note": "Behaviour should not change."
+            "note": "Does not depend on the SLA; actual movement is unchanged."
           },
           {
             "subject": "metric:unfinished",
             "expected": "unchanged",
-            "note": "Already 0."
+            "note": "Stays at 0."
+          },
+          {
+            "subject": "metric:min_company_on_time_rate",
+            "expected": "increase",
+            "note": "A's rate of 0.84 should rise."
           },
           {
             "subject": "vote:A",
             "expected": "yes",
-            "note": "A has the most late pickups and gains the most."
+            "note": "A gains the most on-time deliveries."
           },
           {
             "subject": "vote:B",
             "expected": "yes",
-            "note": "B's utility cannot decrease."
+            "note": "B's utility rises or stays the same."
           },
           {
             "subject": "vote:C",
             "expected": "yes",
-            "note": "C's on-time rate is already 1.00, so its utility is unchanged."
+            "note": "C's utility is unchanged."
           }
         ]
       }

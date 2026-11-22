@@ -1,0 +1,64 @@
+{
+  "note": "claude-opus-5-5、入力 5098 / 出力 1998 トークン",
+  "request_digest": "cbb11949a4ed46e9",
+  "data": {
+    "question": "Should we revert block_k from 2 to 3 (option 1), giving up on-time deliveries in exchange for fewer road violations and higher utility for B and C, or stay at v2 (keep), which finally settles D2.f2?",
+    "background": "This measurement was requested to answer D2.f2, the open question you reserved in D2 and D3 on whether to revert block_k 2 → 3. The revert lowers the KPI's main goal (on_time_deliveries -8.0, 0/5 seeds improved), so it would not pass the improvement gate on its own. The remaining question is whether fewer road violations of unknown safety meaning, and a smaller utility loss for C, justify a measured cost to customers, who have no vote. That is a value judgment you reserved, so I am not deciding it myself.",
+    "options": [
+      {
+        "id": "1",
+        "summary": "Revert to block_k 3. On-time falls from 272.6 to 264.6 (-8.0, 0/5 seeds improved). Late deliveries rise from 2.0 to 10.0. p95_wait_s worsens from 90.0 to 121. Blocked s rises from 1102 to 1855. The lowest on-time rate drops from 0.98 to 0.93, and unfinished stays at 0.0. Road violations fall from 29.6 to 20.4. Check and constitution pass. Votes are A ×, B ○, C ○. Adopting it means accepting a KPI-worsening rule change that fails the improvement gate.",
+        "stakeholders": "Customers lose: about 8 more late deliveries per period and longer tail waits. C gains (utility 68.8 → 77.7) and B gains (76.0 → 80.3). A loses (97.4 → 92.2). Other road users may gain if road violations carry safety risk, but that is unknown."
+      },
+      {
+        "id": "keep",
+        "summary": "Stay at v2 (block_k 2). Current values continue: on-time 272.6, late 2.0, p95_wait_s 90.0, unfinished 0.0, blocked s 1102, lowest on-time rate 0.98, road violations 29.6. No contract or rule change.",
+        "stakeholders": "Customers keep the better service. A keeps its higher utility (97.4). B (76.0) and C (68.8) forgo the gains the revert would give them, about 4.3 and 8.9 utility respectively. Road violations stay at 29.6, which carries an unknown safety cost."
+      }
+    ],
+    "recommendation": {
+      "id": "keep",
+      "reason": "The revert worsens every customer measure: on-time -8.0 on 0/5 seeds, late 2.0 → 10.0, p95_wait_s 90.0 → 121, lowest on-time rate 0.98 → 0.93. It fails the improvement gate. Road violations under v2 are 29.6 this period. That is down from 34.8 in period 3 and close to the 28.0 accepted in D2, so the growth condition from D2 and D3 is not currently being triggered. C's utility under v2 (68.8) is the highest it has been in these measurements, which weakens the case for compensating C at customers' expense. I recommend keeping v2. I also recommend addressing violations with a targeted rule rather than a blanket revert of blocking relief.",
+      "assumptions": [
+        "Road violations have no severe safety meaning that would outweigh customer service; this has not been verified.",
+        "The drop in road violations from 34.8 to 29.6 reflects this period's conditions under v2 rather than random noise, and will not jump back up next period.",
+        "Measurements on the same seeds are representative of next period's demand."
+      ],
+      "predictions": [
+        {
+          "subject": "metric:on_time_deliveries",
+          "expected": "unchanged",
+          "note": "Staying at v2 keeps on-time near 272.6 under current conditions."
+        },
+        {
+          "subject": "metric:late_deliveries",
+          "expected": "unchanged",
+          "note": "Stays around 2.0 rather than rising to 10.0."
+        },
+        {
+          "subject": "metric:p95_wait_s",
+          "expected": "unchanged",
+          "note": "Stays around 90.0 rather than 121."
+        },
+        {
+          "subject": "metric:road_violations",
+          "expected": "unchanged",
+          "note": "Stays around 29.6; the revert would have lowered it to 20.4."
+        },
+        {
+          "subject": "metric:utility@C",
+          "expected": "unchanged",
+          "note": "C stays at 68.8 instead of 77.7."
+        }
+      ]
+    },
+    "unknowns": [
+      "The safety meaning of road violations, and whether 29.6 per period is acceptable to the town and other road users.",
+      "Whether the violation level under v2 will persist, fall, or grow again under next period's demand.",
+      "Whether a targeted rule could reduce violations without reducing on-time deliveries, for example tighter rules at specific road segments.",
+      "The companies' future strategies, and how B and C will respond to another decision against their preference.",
+      "How customers perceive the difference between 2.0 and 10.0 late deliveries and between p95 waits of 90 s and 121 s.",
+      "Next period's demand level and pattern."
+    ]
+  }
+}

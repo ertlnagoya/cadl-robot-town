@@ -45,7 +45,7 @@ There are two amendment loops.
 Assumes Course A's setup: the CADL compiler cloned to `~/program/cadl_repo`, as in
 [Section 2.4 of the Textbook](https://www.ertl.jp/cadl-spec/docs/textbook/toolchain-setup/#24-setup-5-min),
 which also lists fixes for install problems. Use cadl 0.3.32 or later (checked
-with 0.3.38; see `cadl --version`; the decision records need 0.3.38): an older compiler leaves the safety invariant of a
+with 0.3.39; see `cadl --version`; the decision records need 0.3.39): an older compiler leaves the safety invariant of a
 regime transition out of the IR, and the town refuses the rules. A rule file with
 `sos.regimes` (per-regime bindings, cadl 0.3.32) is refused too, since the town does
 not apply those bindings yet.
@@ -248,12 +248,12 @@ current request.
 
 `town.steward` and `town.council` write `runs/<name>/decisions.jsonl` in each run, in the
 format of [Appendix L](https://www.ertl.jp/cadl-spec/docs/spec/appendix-l-decisions) of the
-CADL specification (decisions 0.2): who proposed what, what was measured, how each company
+CADL specification (decisions 0.3): who proposed what, what was measured, how each company
 voted, who recommended what, and who decided with which reason, one entry per line, with the
 hash chain of G.8.
 
 ```bash
-cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.38 or later
+cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.39 or later
 ```
 
 - Each version of the rules is kept as `runs/<name>/v<n>.cadl` and attached to its `version`
@@ -280,13 +280,21 @@ cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.38 or later
   on the rules and the contract of the same period; a change takes effect in the next period
   (`constitution-v<n>.yaml` and a new version of the model). In the record each decider gives
   its `layers`. The steward (and the council), which adopt rule changes by themselves when all
-  the checks pass, act on behalf of the operator (`on_behalf_of`) with `["rule"]`, so the
-  verifier reports the finding delegated for their decisions.
+  the checks pass, act on behalf of the operator (`on_behalf_of`) with `["rule"]`.
+- Who let whom decide: at the start of the record the operator delegates to each party that
+  acts in its place (a `delegation` entry `G.<party>`, decisions 0.3): to the steward or the
+  council the rule layer by its own rule (`procedures: ["automatic"]`, with that rule and the
+  checks as `conditions`), and, with `--decider llm`, to the LLM the layers given with
+  `--delegate`; the regulator likewise to `llm-regulator`. Running the tool, or giving
+  `--delegate`, is that instruction of the human. The verifier then shows each decision made
+  within a delegation under it, and reports the finding delegated only for one outside it.
 - A regulation proposal is measured before the decision: the steward applies the proposed value
   to the measurements of the version in force and of the proposals of the period and to their
   votes (no new run), and records how many proposals then meet the invariants and pass the
-  vote, with the values of the companies and the customers under the rules in force
-  (`P<k>.R<i>.m`).
+  vote, in that period and over every proposal measured in the earlier periods of the record
+  (`..._all`), and for each company how many proposals would pass although it voted against
+  them (`passing_against` in its values), with the values of the companies and the customers
+  under the rules in force (`P<k>.R<i>.m`).
 - A follow-up says what fulfils it, and promises only what someone in the town does. In an
   answer, `follow_ups` items have `text`, `due` (a period) and `kind`:
   - `remeasure` (with `metrics`, such as `utility@C`, `road_violations`): the steward measures
@@ -296,6 +304,11 @@ cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.38 or later
   - `propose`: an amendment to measure; the LLM that proposes amendments sees the open ones in a
     later period, and a proposal that carries one out names it in `fulfils`;
   - `ask` (the default): a question that a later decision settles by naming it in `fulfils`.
+    When its `due` period comes and no decision has settled it, the steward puts it to the
+    decider of its side in a request of its own (`Q<k>` for the operator, `QR<k>` for the
+    regulator; `p<k>-ask.md`, answered with `keep` and a reason under `Q<k>` in
+    `answers.yaml`), and in the last period every open question. The requests of the last
+    period say that no promise made then can be kept.
   A decision that names a promise of another kind does not fulfil it, and the verifier reports
   `fulfilment not shown`.
 - With `--decider llm`, the LLM answers the decision requests in place of the human for the
@@ -306,14 +319,23 @@ cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.38 or later
   The LLM sees the open follow-ups, says which questions a decision settles (`fulfils`), and
   gives each of its own follow-ups a kind (`remeasure`, `propose`, `ask`). It is told not to
   promise investigations that nobody in the town carries out, and not to restate an open
-  promise. The verifier reports the finding delegated for each of its decisions.
+  promise. Its decisions are made within the delegation `G.llm-decider` (or
+  `G.llm-regulator`).
 - `--layers rule,contract` keeps the proposals to the rule and contract layers (regulation
   proposals are left out unmeasured).
-- Samples, decided by the LLM in place of the humans (Claude Opus 5.5, 2026-11-21):
+- Samples, decided by the LLM in place of the humans (Claude Opus 5.5, 2026-11-22):
   `examples/steward-contract/` (Japanese) and `examples/steward-contract-en/` (English), six
   periods under a KPI that allows the promised times to be revised (`--layers rule,contract`);
   `examples/steward-regulation/` and `examples/steward-regulation-en/`, six periods under a KPI
   that allows the regulation to be revised (`--delegate rule,contract,regulation`).
+
+## Checking the examples
+
+`python -m town.check_examples` runs every example again, replaying the recorded LLM outputs
+(no API key), and compares the history, the GSN and the findings of the decision record with
+`examples/expected/<name>/`; it also requires the record to verify without errors and every
+LLM request to be the recorded one. `--update` writes the current results there. GitHub
+Actions runs it on Python 3.9 and 3.14 for each pull request and push to main.
 
 ## License
 

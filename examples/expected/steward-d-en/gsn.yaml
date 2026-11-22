@@ -1,0 +1,200 @@
+nodes:
+- id: G0
+  type: goal
+  text: The town keeps meeting the KPIs set by the human
+  supported_by:
+  - S1
+- id: S1
+  type: strategy
+  text: Argue per version of the KPI
+  supported_by:
+  - G1
+  - G2
+- id: G1
+  type: goal
+  text: 'KPI from period 1: Deliver as many orders as possible across the town within
+    the times we promised customers (120 seconds from order to pickup, 120 seconds
+    from pickup to delivery). No company''s customers should be kept waiting badly.'
+  ref: K1
+  in_context_of:
+  - C1
+  - J1
+  - A1
+  supported_by:
+  - S2
+  - S3
+  - S4
+  - S5
+- id: C1
+  type: context
+  text: 'Measure (chosen by the human): main goal on_time_deliveries (increase), worst_company_p95_wait_s
+    (decrease), unfinished (decrease)'
+- id: J1
+  type: justification
+  text: Follow the order of the KPI. Town-wide on-time deliveries are the main goal,
+    and the worst company's 95th-percentile wait is watched. The KPI gives no level
+    for "badly"; 240 s would be our own reading, so set the level after period 1 is
+    measured.
+  by: human
+- id: A1
+  type: assumption
+  text: Customers cannot choose which company delivers their order
+  by: human
+- id: S2
+  type: strategy
+  text: 'Period 1: v2 block_k 3 → 2 (rule, main goal +9.2, yes: A); adopted against
+    the vote'
+  ref: D1
+  supported_by:
+  - Sn1
+  in_context_of:
+  - C2
+  - J2
+- id: Sn1
+  type: solution
+  text: Measured on the same seeds (p1-evidence.md)
+  file: p1-evidence.md
+- id: C2
+  type: context
+  text: 'Period 1 environment: normal (mean order interval 75 s)'
+- id: J2
+  type: justification
+  text: The intersections are a road shared by the three companies; waiting there
+    is no company's right. On-time deliveries rise on all 5 seeds, late deliveries
+    fall from 10.4 to 1.2 and the worst company's p95 wait from 273 s to 95.6 s, so
+    adopt it against B's and C's votes. Re-measure C's utility (28.8 to 19.0) and
+    the road violations (25.8 to 34.0) next period.
+  by: human
+- id: S3
+  type: strategy
+  text: 'Period 2: no change'
+  ref: D2
+  supported_by:
+  - Sn2
+  in_context_of:
+  - C3
+  - J3
+- id: Sn2
+  type: solution
+  text: Measured on the same seeds (p2-evidence.md)
+  file: p2-evidence.md
+- id: C3
+  type: context
+  text: 'Period 2 environment: normal + rush (mean order interval 75 s)'
+- id: J3
+  type: justification
+  text: The change passes the vote with A and B, but only 2 of 5 seeds improve. Do
+    not cut C's utility from 56.3 to 40.1 for an uncertain gain; the worst company's
+    p95 wait is already 109 s, within the 120 s promise.
+  by: human
+- id: S4
+  type: strategy
+  text: 'Period 3: no change'
+  ref: D3
+  supported_by:
+  - Sn3
+  in_context_of:
+  - C4
+  - J4
+- id: Sn3
+  type: solution
+  text: Measured on the same seeds (p3-evidence.md)
+  file: p3-evidence.md
+- id: C4
+  type: context
+  text: 'Period 3 environment: busy (mean order interval 45 s)'
+- id: J4
+  type: justification
+  text: Nothing could be adopted and nothing raised a reason to ask
+  by: tool
+- id: S5
+  type: strategy
+  text: 'Period 4: no change'
+  ref: D4
+  supported_by:
+  - Sn4
+  in_context_of:
+  - C5
+  - J5
+- id: Sn4
+  type: solution
+  text: Measured on the same seeds (p4-evidence.md)
+  file: p4-evidence.md
+- id: C5
+  type: context
+  text: 'Period 4 environment: busy + rush (mean order interval 45 s)'
+- id: J5
+  type: justification
+  text: Nothing could be adopted and nothing raised a reason to ask
+  by: tool
+- id: G2
+  type: goal
+  text: 'KPI from period 5: The quiet season begins and orders fall. On-time delivery
+    still matters, but to keep the companies cooperating, no single company should
+    gain or lose because of how the road is used.'
+  ref: K5
+  in_context_of:
+  - C6
+  - J6
+  supported_by:
+  - S6
+  - S7
+- id: C6
+  type: context
+  text: 'Measure (chosen by the human): main goal utility_gap (decrease), on_time_rate
+    (increase), min_company_on_time_rate (increase), sanction_total (decrease)'
+- id: J6
+  type: justification
+  text: In the quiet season, keep the companies cooperating; the main goal is narrowing
+    the spread of utility, which includes the sanctions the road rules create. The
+    worst company's on-time rate is watched so that the spread cannot be narrowed
+    by making service worse. Re-measure D1's block_k change under this measure.
+  by: human
+- id: S6
+  type: strategy
+  text: 'Period 5: v3 hold_limit 60s → 70s (rule, main goal +1.7, yes: AC)'
+  ref: D5
+  supported_by:
+  - Sn5
+  in_context_of:
+  - C7
+  - J7
+- id: Sn5
+  type: solution
+  text: Measured on the same seeds (p5-evidence.md)
+  file: p5-evidence.md
+- id: C7
+  type: context
+  text: 'Period 5 environment: quiet (mean order interval 120 s)'
+- id: J7
+  type: justification
+  text: Narrow the spread without making service worse. Options 1 and 3 narrow it
+    more, but late deliveries rise from 1.8 to 7.8 or 6.6 and the lowest on-time rate
+    falls; option 3 also nearly doubles road violations and narrows the spread by
+    no longer counting misuse. hold_limit 60 s → 70 s narrows the spread on 4 of 5
+    seeds, keeps the sanctions and D1's change, and passes the vote with A and C.
+  by: human
+- id: S7
+  type: strategy
+  text: 'Period 6: no change'
+  ref: D6
+  supported_by:
+  - Sn6
+  in_context_of:
+  - C8
+  - J8
+- id: Sn6
+  type: solution
+  text: Measured on the same seeds (p6-evidence.md)
+  file: p6-evidence.md
+- id: C8
+  type: context
+  text: 'Period 6 environment: quiet (mean order interval 120 s)'
+- id: J8
+  type: justification
+  text: Both options narrow the spread by making service worse, which D5 ruled out.
+    block_k 2 → 3 more than triples late deliveries (1.8 to 6.0) and drops the lowest
+    on-time rate to 0.89; hold_limit 70 s → 80 s gains only +1.6 and lowers the lowest
+    on-time rate from 0.97 to 0.94. Look for a change that raises C's utility without
+    worse service.
+  by: human

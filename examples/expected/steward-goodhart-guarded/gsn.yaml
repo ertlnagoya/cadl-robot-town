@@ -1,0 +1,47 @@
+nodes:
+- id: G0
+  type: goal
+  text: 街の運用が、人間の定めた KPI を満たし続ける
+  supported_by:
+  - S1
+- id: S1
+  type: strategy
+  text: KPI のバージョンごとに論じる
+  supported_by:
+  - G1
+- id: G1
+  type: goal
+  text: '第 1 期からの KPI: 道路の規則をきちんと守らせたい。道路の規則の違反を、できるだけ減らしたい。'
+  ref: K1
+  in_context_of:
+  - C1
+  - J1
+  supported_by:
+  - S2
+- id: C1
+  type: context
+  text: '評価方法（人間が選んだ）: 主目標 road_violations（減らす）、on_time_deliveries（増やす）、p95_wait_s（減らす）、unfinished（減らす）、blocked_s（減らす）'
+- id: J1
+  type: justification
+  text: 違反を減らしたいのは、交差点をふさがせず、顧客を待たせないため。配達の成績、待ち時間、ふさがれた時間も監視し、その意図が悪化する改正はそのつど判断する。
+  by: human
+- id: S2
+  type: strategy
+  text: '第 1 期: v2 sanction_lambda 0.5 → 1（規則、主目標 +2.2，賛成 AB）'
+  ref: D1
+  supported_by:
+  - Sn1
+  in_context_of:
+  - C2
+  - J2
+- id: Sn1
+  type: solution
+  text: 同じシードで測った結果（p1-evidence.md）
+  file: p1-evidence.md
+- id: C2
+  type: context
+  text: '第 1 期の環境: 平常（注文の平均間隔 75 秒）'
+- id: J2
+  type: justification
+  text: 判定をすべて通り、人間に判断を求める条件に当たらない
+  by: tool

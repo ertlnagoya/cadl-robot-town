@@ -1,71 +1,102 @@
 {
-  "note": "claude-opus-5-5、入力 3620 / 出力 2279 トークン",
-  "request_digest": "9bdd70009993b95f",
+  "note": "claude-opus-5-5、入力 3616 / 出力 2322 トークン",
+  "request_digest": "221ffb1abe33446e",
   "data": {
-    "question": "Should we adopt the rule change block_k 3 → 2, which raises on-time deliveries but which Companies B and C voted against, or keep the current rules (v2)?",
-    "background": "Option 1 passed cadl check and the constitution, and it improves the main goal on_time_deliveries by +1.6. It failed the company vote: A voted for it, B and C voted against. Adopting it would mean overriding two of the three companies, and only 2 of 5 seeds improved, so the gain is not clearly robust. Weighing customer gains against the companies' losses and their vote is a judgment for a human, not for me.",
+    "question": "Should we adopt the rule change block_k 3 → 2 (evict parked robots earlier) even though companies B and C voted against it, or keep the current rules (v1) for another period?",
+    "background": "Option 1 passes check, the constitution and the KPI conditions, and it improves the main goal on_time_deliveries by +7.2 on 5/5 seeds. However, B and C voted it down, so the company vote fails. Whether customer gains justify overriding the companies is a judgment between parties that I should not make myself. In D1 you rejected a similar change because nobody had yet tried to win B and C's agreement, and you said option 1 would be revisited with an explicit decision on the vote. That decision is now needed.",
     "options": [
       {
         "id": "1",
-        "summary": "Robots waiting behind a parked robot trigger its eviction once two are waiting instead of three. On-time rises from 223.6 to 225.2 (+1.6), but only 2/5 seeds improved. Late falls from 4.4 to 2.8, and blocked s falls from 915 to 682. The lowest on-time rate rises from 0.96 to 0.98. Customer monitors all improve or hold: p95_wait_s 116 → 108, max_wait_s 154 → 141, unfinished stays at 0.0. Road violations rise from 18.2 to 24.0. Utility moves from 73.8 / 69.8 / 58.2 to 73.8 / 61.4 / 46.0. Votes were A ○, B ×, C ×, so adopting it means overriding B and C.",
-        "stakeholders": "Customers gain: fewer late deliveries and shorter typical and worst-case waits, with no loss on any customer monitor. Company A is unaffected (utility 73.8). Company B loses (69.8 → 61.4). Company C loses the most (58.2 → 46.0), on top of its earlier loss from D1 (28.8 → 19.2 in period 1). Other road users face more road violations (18.2 → 24.0). Overriding a majority 'no' vote may also weaken the companies' trust in the rule process."
+        "summary": "Adopt block_k 3 → 2. Per the table: on-time rises from 216.6 to 223.8 (+7.2, 5/5 seeds), late falls from 11.4 to 4.2, p95_wait_s falls from 138 to 110, blocked s falls from 1824 to 936, lowest on-time rate rises from 0.93 to 0.97 and unfinished stays at 0.0. Road violations rise from 19.0 to 28.0. Utility moves from 69.8 / 68.5 / 65.8 to 73.4 / 65.5 / 56.3. Adopting it overrides the votes of B and C (A ○, B ×, C ×).",
+        "stakeholders": "Customers gain: more deliveries on time, far fewer late, shorter tail waits, and no contract change. Company A gains (+3.6 utility). Company C loses heavily (-9.5, about 14% of its utility). Company B loses slightly (-3.0). Other road users may be affected by more road violations (+9.0). Company trust in the vote process may suffer from an override."
       },
       {
         "id": "keep",
-        "summary": "Stay at v2. Current values remain: on-time 223.6, late 4.4, blocked s 915, road violations 18.2, lowest on-time rate 0.96. Customer monitors stay at p95_wait_s 116, max_wait_s 154 and unfinished 0.0. Utility stays at 73.8 / 69.8 / 58.2.",
-        "stakeholders": "Companies B and C keep their current utility, and their vote is respected. Customers forgo the measured improvements: about 1.6 fewer on-time deliveries, 1.6 more late deliveries, and longer waits (p95 116 vs 108, max 154 vs 141). Road violations stay lower. Company A is indifferent."
+        "summary": "Stay at v1. On-time stays at 216.6, late at 11.4, p95_wait_s at 138, blocked s at 1824 and road violations at 19.0. Utility stays 69.8 / 68.5 / 65.8. No vote is overridden.",
+        "stakeholders": "Companies B and C keep their current utility, and C avoids its large loss. Company A forgoes its gain. Customers keep bearing about 7 more late deliveries per period and longer tail waits (p95 138 vs 110) for at least one more period. This is the second period in which this known cost is accepted."
       }
     ],
     "recommendation": {
-      "id": "keep",
-      "reason": "Option 1's mean gain on the main goal (+1.6) is small, and it improved on only 2 of 5 seeds, so a majority of seeds did not improve. That is weak evidence for overriding a majority 'no' vote by B and C, whose utility falls sharply (C 58.2 → 46.0, after an earlier loss in D1). It would also raise road violations by about 30%. The customer gains are real but modest, and the current rules already deliver 223.6 on time with 0.0 unfinished. I recommend keeping v2 and re-measuring option 1 with more seeds. A human may reasonably choose option 1 instead if the customer wait improvements are judged decisive under the KPI.",
+      "id": "1",
+      "reason": "The customer gains are large, consistent (5/5 seeds) and come from real service improvement: blocked time halves and p95 wait falls, not a redefinition of 'on time'. The contract is unchanged, so customers get these gains at no cost to their promises. C's loss is smaller in relative terms than in period 1 (about 14% vs about a third). Rejecting a second time would repeat a known cost to customers, who have no vote. Road violations rising from 19.0 to 28.0 is the main non-company cost and should be watched. If you prefer not to override, keep and use this period to negotiate with B and C, for example a compensating rule for C.",
       "assumptions": [
-        "The 2/5 seed result reflects real variance rather than a consistent small gain hidden by noise.",
-        "The increase in road violations does not itself harm customers beyond what the measured wait metrics show.",
-        "B's and C's votes reflect their utility losses and not strategic voting.",
-        "Fairness between companies is still outside the KPI as written (K1), but repeated losses for C are worth weighing."
+        "The re-measured period-2 results will hold in the next period, as F2.D1.f1 showed reproducibility for the earlier measurement.",
+        "The extra road violations are not safety-critical and stay within constitutional limits (the constitution check passed).",
+        "B and C will not change their behavior strongly, for example by withdrawing robots, in response to an override.",
+        "max_wait_s is not worsened, though it is not shown in the table."
       ],
       "predictions": [
         {
           "subject": "metric:on_time_deliveries",
-          "expected": "unchanged",
-          "note": "Keeping v2 leaves on-time at about 223.6."
+          "expected": "increase",
+          "note": "216.6 -> about 223.8"
+        },
+        {
+          "subject": "metric:late_deliveries",
+          "expected": "decrease",
+          "note": "11.4 -> about 4.2"
         },
         {
           "subject": "metric:p95_wait_s",
-          "expected": "unchanged",
-          "note": "Stays at about 116."
+          "expected": "decrease",
+          "note": "138 -> about 110"
         },
         {
-          "subject": "metric:max_wait_s",
-          "expected": "unchanged",
-          "note": "Stays at about 154."
+          "subject": "metric:blocked_s",
+          "expected": "decrease",
+          "note": "1824 -> about 936"
         },
         {
           "subject": "metric:unfinished",
           "expected": "unchanged",
-          "note": "Stays at 0.0."
+          "note": "stays 0.0"
         },
         {
           "subject": "metric:road_violations",
-          "expected": "unchanged",
-          "note": "Stays at about 18.2, avoiding the rise to 24.0."
+          "expected": "increase",
+          "note": "19.0 -> about 28.0"
+        },
+        {
+          "subject": "metric:utility@A",
+          "expected": "increase",
+          "note": "69.8 -> 73.4"
+        },
+        {
+          "subject": "metric:utility@B",
+          "expected": "decrease",
+          "note": "68.5 -> 65.5"
         },
         {
           "subject": "metric:utility@C",
-          "expected": "unchanged",
-          "note": "C keeps 58.2 instead of falling to 46.0."
+          "expected": "decrease",
+          "note": "65.8 -> 56.3"
+        },
+        {
+          "subject": "vote:A",
+          "expected": "yes",
+          "note": "as measured"
+        },
+        {
+          "subject": "vote:B",
+          "expected": "no",
+          "note": "as measured"
+        },
+        {
+          "subject": "vote:C",
+          "expected": "no",
+          "note": "as measured"
         }
       ]
     },
     "unknowns": [
-      "Whether the +1.6 on-time gain holds over more seeds, or whether it is driven by a few seeds.",
-      "How customers weigh shorter waits (p95 −8 s, max −13 s) against the change, and whether they notice it at all.",
-      "Why B and C lose utility: more evictions of their parked robots, or longer routes.",
-      "How B and C would change their behaviour, such as parking strategy, if option 1 were imposed against their vote.",
-      "Next period's demand level, and whether congestion, and so the value of earlier eviction, will grow or shrink.",
-      "Whether the higher road violations affect safety or other road users in ways not captured in the table.",
-      "Whether another block_k value or a combined change could keep the customer gains with smaller losses for B and C."
+      "Whether B and C would accept the change with compensation or a modified rule (e.g. a different block_k or exemptions), since no negotiation has been attempted or measured.",
+      "How B and C will adapt their robot policies after an override, and whether that erodes the measured gains.",
+      "Why C is hurt so much (which robots or routes) and whether a targeted rule could reduce its loss.",
+      "What the extra road violations mean for safety and for other road users.",
+      "How customers perceive the change; only aggregate metrics are measured, not satisfaction.",
+      "max_wait_s under option 1, which is not in the table.",
+      "Next period's demand level and whether the gains scale with it.",
+      "Long-term effects on company cooperation and on future votes if a vote is overridden."
     ]
   }
 }

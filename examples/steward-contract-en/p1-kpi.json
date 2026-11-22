@@ -1,78 +1,62 @@
 {
-  "note": "claude-opus-5-5、入力 3083 / 出力 2150 トークン",
+  "note": "claude-opus-5-5、入力 3083 / 出力 1702 トークン",
   "request_digest": "4851e7945fbf9b46",
   "data": {
-    "interpretation": "The KPI asks to maximize the number of orders delivered within the promised pickup and delivery times across the whole town, so the primary metric is on_time_deliveries. The promised times (DELIVERY_SLA) may be revised, but 'on time' is defined by the SLA itself. Loosening the SLA can raise on_time_deliveries without customers getting their orders any sooner. To measure the effect on customers, SLA-independent metrics are needed: the order-to-delivery wait times (p95_wait_s, max_wait_s) and unfinished orders. The KPI states no numeric levels, so no targets or guard values are set.",
+    "interpretation": "The KPI asks to maximize the number of orders delivered within the promised (SLA) times across the whole town. Because the promised times themselves may be revised, the on-time count is partly a proxy: loosening the SLA can raise it without customers actually receiving goods sooner. The KPI therefore also requires that any customer-worsening SLA change be justified with a measured effect on customers, best captured by SLA-independent measures such as order-to-delivery wait time and unfinished orders. No numeric achievement levels are stated, so no targets or guard values are set.",
     "options": [
       {
-        "label": "On-time count as primary, with SLA-independent customer-impact monitors",
+        "label": "On-time count as primary, customer wait and unfinished orders monitored",
         "goals": [
           {
             "metric": "on_time_deliveries",
-            "text": "Number of orders delivered within the promised pickup and delivery times, town-wide (maximize)."
+            "text": "Maximize the number of orders delivered within the promised pickup and delivery times across the town."
           },
           {
             "metric": "p95_wait_s",
-            "text": "95th-percentile order-to-delivery wait time, town-wide. It does not depend on the SLA, so it shows whether customers actually wait longer after a change."
-          },
-          {
-            "metric": "max_wait_s",
-            "text": "Longest order-to-delivery wait in the town. Monitored so a change cannot hide very long waits for a few customers."
+            "text": "Monitor the town-wide 95th percentile order-to-delivery wait, which does not depend on the SLA, so that SLA loosening that makes customers wait longer is visible."
           },
           {
             "metric": "unfinished",
-            "text": "Orders still undelivered at the end of the period. Monitored so no improvement comes from leaving orders undelivered."
-          }
-        ],
-        "guards": [],
-        "note": "Recommended. This is the direct reading of 'as many orders as possible within the promised times'. The wait-time monitors give the human the measured customer effect that the KPI requires before accepting any change that is worse for customers, such as a looser SLA. No guard values are set because the KPI gives no levels."
-      },
-      {
-        "label": "On-time count as primary, monitoring only SLA-relative outcomes",
-        "goals": [
-          {
-            "metric": "on_time_deliveries",
-            "text": "Number of orders delivered within the promised times, town-wide (maximize)."
+            "text": "Monitor orders still undelivered at the end of the period, so that gains in on-time count are not bought by abandoning orders."
           },
           {
             "metric": "late_deliveries",
-            "text": "Orders delivered later than promised (minimize)."
-          },
-          {
-            "metric": "unfinished",
-            "text": "Orders still undelivered at the end of the period (minimize)."
+            "text": "Monitor late deliveries, which count promises that were broken."
           }
         ],
         "guards": [],
-        "note": "A literal reading that judges everything against the current promises. It is simpler, but every metric here moves when the SLA is redefined. An SLA loosening would look like a pure improvement, with no measurement of how much longer customers actually wait."
+        "note": "Closest to the literal KPI. Customer impact is measured by the monitored goals and reported for any SLA change; the human decides whether a worsening is justified, since no acceptable level was stated."
       },
       {
-        "label": "Actual customer wait as primary, on-time count monitored",
+        "label": "Customer wait as primary, on-time count monitored",
         "goals": [
           {
             "metric": "p95_wait_s",
-            "text": "95th-percentile order-to-delivery wait time, town-wide (minimize). This cannot be improved by changing the promises."
+            "text": "Minimize the town-wide 95th percentile order-to-delivery wait, a measure of customer experience that SLA revisions cannot change by definition alone."
           },
           {
             "metric": "on_time_deliveries",
-            "text": "Number of orders delivered within the promised times (monitored, should not drop)."
+            "text": "Monitor the number of orders delivered within the promised times."
           },
           {
             "metric": "unfinished",
-            "text": "Orders still undelivered at the end of the period (monitored)."
+            "text": "Monitor orders left undelivered at the end of the period."
+          },
+          {
+            "metric": "max_wait_s",
+            "text": "Monitor the longest wait any customer experiences."
           }
         ],
         "guards": [],
-        "note": "Robust against SLA gaming, but it shifts the main objective away from the KPI's stated goal of counting on-time deliveries. Use it only if the human considers actual speed to be the true intent."
+        "note": "Protects against gaming the on-time count by loosening promises, but departs from the KPI's stated objective of maximizing on-time deliveries; rule changes that improve the on-time count while slightly raising tail wait would not count as improvements."
       }
     ],
     "recommended": 1,
     "concerns": [
-      "on_time_deliveries is a proxy defined by the SLA itself. Because the KPI allows revising promised times, loosening the SLA can raise the on-time count while customers wait just as long or longer. SLA-independent wait metrics should be measured alongside it.",
-      "The KPI requires that a change worse for customers be justified after measuring its effect, but it does not say which measure defines 'worse for customers'. Candidates are p95_wait_s, max_wait_s and unfinished. The human should confirm which one or ones apply.",
-      "The KPI gives no numeric levels (e.g., a minimum on-time count or a maximum acceptable wait), so no targets or guards were set. If hard limits on customer wait are intended, the human should state them.",
-      "SLA changes are contract-layer amendments. Customers do not vote, so any SLA revision must be decided by a human, using the measured wait-time effects.",
-      "The KPI is town-wide and says nothing about fairness between companies A, B and C. If one company's on-time rate collapsing is unacceptable, that should be stated explicitly."
+      "on_time_deliveries depends on the promised times: loosening DELIVERY_SLA can raise it with no real benefit to customers. SLA-independent measures (p95_wait_s, max_wait_s, unfinished) must be reported for any SLA proposal, and SLA changes are always decided by a human because customers do not vote.",
+      "The KPI states no achievement level (no target on-time count or maximum acceptable wait), so no targets or guards were set. If a floor on customer wait or a minimum on-time rate is intended, the human should state it.",
+      "'As many orders as possible' is read as a count (on_time_deliveries). If order volume is identical under the same seed, this is equivalent to on_time_rate; if volume can differ between runs, the two may diverge.",
+      "The KPI is town-wide; it does not ask for fairness between companies A, B and C, so company-level metrics are not included. Rule changes that improve the town total while hurting one company may still be rejected in company voting."
     ],
     "revisit": []
   }
