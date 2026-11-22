@@ -1,29 +1,29 @@
 {
-  "note": "claude-opus-5-5、入力 2987 / 出力 2282 トークン",
-  "request_digest": "0219fd4894b7661b",
+  "note": "claude-opus-5-5、入力 3013 / 出力 2498 トークン",
+  "request_digest": "898ea2b355a8c81c",
   "data": {
-    "question": "Should block_k be lowered from 3 to 2, so that parked robots are evicted sooner, even though companies B and C voted against it? Adopting it would require a human-approved override or revision of the regulation's voting and quorum rule, so the alternative is to keep the current rules (v1).",
-    "background": "Amendment 1 passed cadl check and the constitution and improved the main goal on_time_deliveries by +9.2 on 5/5 seeds. B and C voted it down, so it cannot be adopted as an ordinary rule change. Getting past their votes means changing how the regulation counts votes or applying an override, and that is a regulation-layer decision. The constitution reserves those decisions for humans, and the trade-off between customers and the companies' own utility is not mine to settle.",
+    "question": "Should the town adopt the rule change block_k 3 → 2 (evict a parked robot once 2 robots wait behind it), even though B and C voted against it, which would require revising the regulation (the voting quorum), or keep the current rules?",
+    "background": "Option 1 passed cadl check and the constitution and improved on_time_deliveries by +9.2 on 5/5 seeds, and every KPI condition improved. But B and C voted it down, so it cannot be adopted as a rule under the current quorum. Adopting it anyway means overriding or revising the companies' voting rights, which is a regulation-level decision that reaches all three companies and the customers, so I must not make it myself. Under the earlier process rule (K1), any regulation revision goes to you with an impact statement for A, B, C and the customers.",
     "options": [
       {
         "id": "1",
-        "summary": "Adopt block_k 3 → 2. Measured results: on-time rises from 121.8 to 131.0 (+9.2, 5/5 seeds improved). Late falls from 10.4 to 1.2. Blocked s falls from 2404 to 985. Lowest on-time rate rises from 0.84 to 0.98, and unfinished stays at 0.0. Road violations rise from 25.8 to 34.0. Utility A / B / C moves from 38.4 / 38.9 / 28.8 to 45.4 / 37.2 / 19.0. Because B and C voted ×, adoption needs a human override or a regulation revision of the vote and quorum rule.",
-        "stakeholders": "Customers of all three companies gain: more orders arrive within the promised time, and the weakest company's on-time rate rises to 0.98. Company A gains utility (38.4 → 45.4). Company B loses a little (38.9 → 37.2). Company C loses heavily (28.8 → 19.0), likely because its robots are evicted from parking spots more often. Other road users bear more road violations (25.8 → 34.0). Overriding B's and C's votes also weakens the companies' trust in the voting process and sets a precedent."
+        "summary": "Adopt block_k 3 → 2 by revising the regulation (for example, the quorum for rules that pass all KPI conditions on every seed). Measured: on-time 121.8 → 131.0 (+9.2, 5/5 seeds), late 10.4 → 1.2, blocked s 2404 → 985, lowest on-time rate 0.84 → 0.98, worst_company_p95_wait_s 273 → 95.6, unfinished stays 0.0. Road violations rise from 25.8 to 34.0. Utility A / B / C goes from 38.4 / 38.9 / 28.8 to 45.4 / 37.2 / 19.0.",
+        "stakeholders": "Customers of all three companies gain: the lowest company on-time rate rises from 0.84 to 0.98 and late deliveries fall from 10.4 to 1.2, so B's and C's customers are also served better. Company A gains (utility 38.4 → 45.4). Company B loses a little (38.9 → 37.2), and Company C loses heavily (28.8 → 19.0, about a third), probably because its parked robots are evicted more often. All companies lose part of their veto power if the quorum is revised, and that precedent applies to future amendments. Other road users may be affected by the rise in road violations (25.8 → 34.0)."
       },
       {
         "id": "keep",
-        "summary": "Make no change and stay at v1. On-time stays at 121.8, late at 10.4, blocked s at 2404, and lowest on-time rate at 0.84. Road violations stay at 25.8, and utility A / B / C stays at 38.4 / 38.9 / 28.8. The vote and quorum rule is left untouched.",
-        "stakeholders": "Companies B and C keep their current utility, and C is spared a large loss. The voting process is respected. Customers lose the measured gain: about 9 more late deliveries per period, and the weakest company's customers stay at a 0.84 on-time rate. Company A forgoes its gain."
+        "summary": "Stay at v1 with no change. On-time 121.8, late 10.4, blocked s 2404, lowest on-time rate 0.84, worst_company_p95_wait_s 273, road violations 25.8. Utility A / B / C 38.4 / 38.9 / 28.8. The companies' voting rights stay as they are.",
+        "stakeholders": "Companies B and C keep their current utility and their full veto. Company A forgoes a gain. Customers keep the worse service: about 9 fewer on-time deliveries per run, more late orders, and the worst-served company's customers stay at a 0.84 on-time rate with a p95 wait of 273 s. Road violations stay lower."
       }
     ],
     "recommendation": {
       "id": "1",
-      "reason": "The KPI ranks town-wide on-time delivery first and then asks that no company's customers be left behind. Option 1 improves both: +9.2 on-time on 5/5 seeds, and the lowest on-time rate rises from 0.84 to 0.98. The KPI also explicitly allows a regulation revision when votes block amendments that are good for customers. Two costs remain: road violations rise from 25.8 to 34.0, and C's utility drops sharply. I therefore suggest adopting it with an explicit record of the override. I also suggest the human consider compensating C or reviewing the change in a later period, and confirm that the higher road-violation count is acceptable.",
+      "reason": "The KPI puts town-wide on-time deliveries first and asks that no company's customers be left behind. Option 1 improves both strongly and consistently (+9.2 on 5/5 seeds, lowest on-time rate 0.84 → 0.98, worst p95 wait 273 → 95.6), and the KPI explicitly allows a regulation revision when votes block amendments that are good for customers. Before adopting it, I advise two steps. First, scope the regulation revision narrowly, for example only for rule changes that pass check and the constitution and improve every KPI condition on all seeds. Second, address C's large utility loss, for example through a follow-up amendment or compensation, and review the rise in road violations.",
       "assumptions": [
-        "The 5-seed measurement represents normal demand in the coming periods.",
-        "C's utility loss falls on the company and not on C's customers, which the lowest on-time rate of 0.98 suggests.",
-        "The added road violations do not create safety risks that matter more than on-time delivery.",
-        "B and C will keep operating normally rather than changing strategy after being overridden."
+        "The 5-seed measurements represent real operating conditions in the coming periods.",
+        "The rise in road violations (25.8 → 34.0) does not reflect a safety problem that the constitution's invariants fail to capture.",
+        "C's utility loss comes from evictions of its parked robots and does not reflect worse service to C's customers; the lowest on-time rate of 0.98 suggests this.",
+        "A narrowly scoped quorum revision will not be used later to push through changes that harm customers."
       ],
       "predictions": [
         {
@@ -44,12 +44,17 @@
         {
           "subject": "metric:road_violations",
           "expected": "increase",
-          "note": "Measured 25.8 → 34.0."
+          "note": "Measured 25.8 → 34.0; this is a cost of the change."
         },
         {
           "subject": "metric:min_company_on_time_rate",
           "expected": "increase",
           "note": "Measured 0.84 → 0.98."
+        },
+        {
+          "subject": "metric:worst_company_p95_wait_s",
+          "expected": "decrease",
+          "note": "Measured 273 → 95.6."
         },
         {
           "subject": "metric:unfinished",
@@ -74,12 +79,12 @@
       ]
     },
     "unknowns": [
-      "How B and C will respond to being overridden, for example by changing routing or parking behaviour, or by voting against later amendments.",
-      "Why C loses so much utility, and whether a smaller change or compensation could win C's vote.",
-      "How customers perceive the change, beyond the measured on-time figures.",
-      "Whether the higher road-violation count carries safety or legal costs that the table does not capture.",
-      "Next period's demand and whether the gain holds outside the 5 measured seeds.",
-      "Which exact regulation revision (quorum or override clause) would be needed, and what precedent it sets for future votes."
+      "Why C's utility drops so sharply, and whether C would change its robots' parking behaviour after the change.",
+      "Whether B and C would accept a quorum revision, or would respond by changing how they operate or how they vote in the future.",
+      "What kinds of road violations increase, and whether they matter for safety or for other road users.",
+      "How customers perceive evictions, and whether evicted robots cause any delay or handling issues for customers.",
+      "Demand and traffic in the next period, and whether the improvement holds beyond the 5 measured seeds.",
+      "Whether a compensating amendment could restore C's utility without losing the customer gains; this has not been measured."
     ]
   }
 }

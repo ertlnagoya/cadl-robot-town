@@ -1,45 +1,39 @@
 {
-  "note": "claude-opus-5-5、入力 4290 / 出力 1080 トークン",
-  "request_digest": "5d2edfc71cee05b0",
+  "note": "claude-opus-5-5、入力 4032 / 出力 901 トークン",
+  "request_digest": "5c26b0fc40b3f2ea",
   "data": {
     "choice": "1",
-    "reason": "KPI は「顧客に約束した時間のうちに届く配達を、町全体でできるだけ増やしたい」と直接書いているため、主目標は on_time_deliveries（増やす）とするのが KPI の文言に最も近い読み方です。KPI は、守れない約束を守れる約束に直す見直しも認めています。選択肢 2 では、そのような改正を改善として測れません。一方、約束を緩めるだけで定時配達件数が増えるおそれがあります。そこで、約束の時間に左右されない p95_wait_s・max_wait_s・unfinished を監視する目標に入れます。契約の層の改正でこれらが悪化した場合は、値を示して人間の判断に回します。この運用で、KPI が求める「顧客への影響を測ったうえで理由を示す」を満たせます。推奨どおり選択肢 1 を選びます。会社間の差（min_company_on_time_rate、on_time_rate_gap）は KPI が町全体を対象としているため評価方法に入れませんが、各社の投票で否決される可能性があるので、後の判断で扱う問いとして残します。悪化をどこまで許すかの水準（guards）は KPI に書かれていないため、この期では設定しません。",
+    "reason": "KPI の文は、約束した時間のうちに届く配達を町全体で増やすことを直接求めています。そのため、定時配達件数（on_time_deliveries）を主目標とする選択肢 1 が KPI の文に最も近い読み方です。KPI は約束の時間の見直しを認めていますが、顧客に不利な変更には顧客への影響を測ったうえでの理由を求めています。選択肢 1 では、約束の時間に左右されない p95_wait_s、max_wait_s、unfinished を監視目標に入れるので、約束を緩めるだけで定時配達件数が増える改正があっても、待ち時間の悪化として示されます。そのうえで人間が顧客への影響を確かめて判断できます。選択肢 2 は約束を緩めるだけの改正を防げますが、KPI の文が求める指標から離れます。また、約束の見直しを認めるという KPI の意図とも合いにくいです。LLM の推奨も 1 です。target と guards は、KPI に水準が書かれていないので置きません。約束の時間を見直す改正が出たときに、待ち時間の悪化をどこまで許すかを改めて判断します。",
     "assumptions": [
-      "同じ乱数シードで測るため、改正の前後で注文件数は変わらず、on_time_deliveries と on_time_rate の改善の判定は一致する。",
-      "p95_wait_s・max_wait_s・unfinished は約束の時間（DELIVERY_SLA）の値に左右されない。",
-      "規則の層（ROAD_USE、sos.transitions）の改正は、約束の時間を変えずに実際の配達の速さを変える。"
+      "測定に使う乱数シードと需要は期ごとに同じ条件で比べられる",
+      "p95_wait_s と max_wait_s は約束の時間（DELIVERY_SLA）の値に左右されずに計算される",
+      "未配達件数 unfinished は測定期間の終わりに残った注文を数えている"
     ],
     "unknowns": [
-      "現行の規則での on_time_deliveries、p95_wait_s、unfinished の水準と、約束の時間がどの程度守れていないか。",
-      "顧客の待ち時間の悪化をどこまで許すかの水準（guards の value）。",
-      "会社ごとの定時率の差が、各社の投票にどの程度影響するか。"
+      "現在の規則での on_time_deliveries、p95_wait_s、max_wait_s、unfinished の値",
+      "顧客にとって許される待ち時間の悪化の水準",
+      "会社ごとの定時率の差が今後の改正でどれだけ広がるか"
     ],
     "predictions": [
       {
         "subject": "metric:on_time_deliveries",
         "expected": "unchanged",
-        "note": "この判断は評価方法を決めるだけで、規則や契約は変えないため、測った値は変わらない。"
+        "note": "この判断は評価方法を決めるだけで、規則や契約は変えないので、測定値そのものは変わらない"
       },
       {
         "subject": "metric:p95_wait_s",
         "expected": "unchanged",
-        "note": "評価方法の決定のみで、規則は変わらない。"
+        "note": "規則が変わらないため実際の待ち時間も変わらない"
       },
       {
         "subject": "metric:unfinished",
         "expected": "unchanged",
-        "note": "評価方法の決定のみで、規則は変わらない。"
+        "note": "規則が変わらないため未配達件数も変わらない"
       }
     ],
     "follow_ups": [
       {
-        "text": "会社間の差（min_company_on_time_rate、on_time_rate_gap）を監視する目標に加えるかどうかを、各社の投票の結果を見て決める。",
-        "due_period": 3,
-        "kind": "ask",
-        "metrics": []
-      },
-      {
-        "text": "顧客の待ち時間（p95_wait_s、max_wait_s）と unfinished について、悪化を許す水準を guards として設定するかどうかを、契約の層の改正案が初めて出た時点で決める。",
+        "text": "約束の時間（DELIVERY_SLA）を緩める改正を判断するとき、p95_wait_s と max_wait_s の悪化をどこまで許すかの水準（guards）を決める。",
         "due_period": 3,
         "kind": "ask",
         "metrics": []

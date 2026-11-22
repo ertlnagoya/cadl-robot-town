@@ -1,0 +1,416 @@
+nodes:
+- id: G0
+  type: goal
+  text: The town keeps meeting the KPIs set by the human
+  supported_by:
+  - S1
+- id: S1
+  type: strategy
+  text: Argue per version of the KPI
+  supported_by:
+  - G1
+- id: G1
+  type: goal
+  text: 'KPI from period 1: Deliver as many orders as possible across the town within
+    the times we promised customers. The promised times (from order to pickup, and
+    from pickup to delivery) may be revised if that is better than keeping promises
+    we cannot keep. A change that is worse for customers needs a reason, given after
+    measuring its effect on them.'
+  ref: K1
+  in_context_of:
+  - C1
+  - J1
+  - A1
+  - A2
+  - A3
+  supported_by:
+  - S2
+  - S3
+  - S4
+  - S5
+  - S6
+  - S7
+- id: C1
+  type: context
+  text: 'Measure (chosen by the human): main goal on_time_deliveries (increase), p95_wait_s
+    (decrease), unfinished (decrease), late_deliveries (decrease)'
+- id: J1
+  type: justification
+  text: The KPI literally asks to deliver as many orders as possible within the promised
+    times, so on_time_deliveries is the faithful primary goal. The KPI also allows
+    revising the promised times and requires that customer-worsening changes be justified
+    by their measured effect on customers. Option 1 meets that requirement by monitoring
+    SLA-independent measures (p95_wait_s, unfinished) alongside late_deliveries. Option
+    2 would guard against gaming but would reject rule changes the KPI wants, those
+    that raise the on-time count at a small cost in tail wait. The gaming risk is
+    better handled by the rule that every SLA change is decided by a human after customer
+    impact (p95_wait_s, max_wait_s, unfinished) has been reported. No measurements
+    exist yet (period 1), so no table values are cited. No numeric targets or guards
+    are set because the KPI states none. I follow the LLM's recommendation.
+  by: llm
+- id: A1
+  type: assumption
+  text: Order volume is the same across runs with the same seed and demand, so on_time_deliveries
+    and on_time_rate rank options the same way.
+  by: llm
+- id: A2
+  type: assumption
+  text: p95_wait_s and unfinished are measured independently of the SLA thresholds.
+  by: llm
+- id: A3
+  type: assumption
+  text: Any DELIVERY_SLA proposal will report p95_wait_s, max_wait_s and unfinished
+    before a human decides.
+  by: llm
+- id: S2
+  type: strategy
+  text: 'Period 1: no change'
+  ref: D1
+  supported_by:
+  - Sn1
+  in_context_of:
+  - C2
+  - J2
+  - A4
+  - A5
+  - A6
+- id: Sn1
+  type: solution
+  text: Measured on the same seeds (p1-evidence.md)
+  file: p1-evidence.md
+- id: C2
+  type: context
+  text: 'Period 1 environment: normal (mean order interval 75 s)'
+- id: J2
+  type: justification
+  text: 'Option 1 is clearly the best for the KPI and for customers. on_time_deliveries
+    rises from 121.8 to 131.0 (+9.2, 5/5 seeds), late_deliveries falls from 10.4 to
+    1.2, and p95_wait_s falls from 188 to 81.4. However, the companies'' vote is one
+    of the machine judgments, and B and C rejected it. C would lose heavily (utility
+    28.8 -> 19.0) and B slightly (38.9 -> 37.2), while road violations rise from 25.8
+    to 34.0. As a delegate, I do not think I should override a failed company vote
+    that takes about a third of one company''s utility in the first period, before
+    anyone has tried to win B and C''s agreement. I am rejecting the recommendation
+    for now, not discarding option 1. I reject option 2 although all three companies
+    voted for it, because customers do not vote. Its gain is only +0.8 (122.6 vs 121.8)
+    on 3/5 seeds. blocked s stays at 2404 and p95_wait_s stays at 188, so the gain
+    comes from redefining ''on time'', not from serving customers faster. Under K1,
+    a customer-worsening contract change must be justified by its measured effect
+    on customers, and this one is not. This settles K1.d.f1: the first SLA change
+    is not justified. For now I set no numeric wait limit beyond requiring that any
+    SLA relaxation must not worsen p95_wait_s, max_wait_s or unfinished, and must
+    show real service gains. Keeping v1 keeps on-time 121.8, late 10.4 and p95 188
+    for one more period. That is a known cost to customers, which I accept so that
+    option 1 can be revisited with an explicit decision on the vote.'
+  by: llm
+- id: A4
+  type: assumption
+  text: The current v1 results (on-time 121.8, late 10.4, p95_wait_s 188) will roughly
+    persist next period under similar demand.
+  by: llm
+- id: A5
+  type: assumption
+  text: B and C's objection is mainly about their own utility loss, which a later
+    agreement or override decision could address.
+  by: llm
+- id: A6
+  type: assumption
+  text: A one-period delay in adopting block_k 2 does not cause irreversible harm
+    to customers.
+  by: llm
+- id: S3
+  type: strategy
+  text: 'Period 2: v2 block_k 3 → 2 (rule, main goal +7.2, yes: A); adopted against
+    the vote'
+  ref: D2
+  supported_by:
+  - Sn2
+  in_context_of:
+  - C3
+  - J3
+  - A7
+  - A8
+  - A9
+  - A10
+- id: Sn2
+  type: solution
+  text: Measured on the same seeds (p2-evidence.md)
+  file: p2-evidence.md
+- id: C3
+  type: context
+  text: 'Period 2 environment: normal + rush (mean order interval 75 s)'
+- id: J3
+  type: justification
+  text: 'This settles D1.f2: I adopt block_k 3 → 2 over the votes of B and C (A ○,
+    B ×, C ×). The customer gain is now measured in two periods under different demand.
+    In period 1 on-time rose by +9.2 on 5/5 seeds. Now on-time rises from 216.6 to
+    223.8 (+7.2, 5/5 seeds), late falls from 11.4 to 4.2, p95_wait_s falls from 138
+    to 110 and blocked s falls from 1824 to 936. The lowest on-time rate rises from
+    0.93 to 0.97 and unfinished stays at 0.0. These are real service gains: blocked
+    time halves and the contract is unchanged, so ''on time'' is not being redefined.
+    This is what the KPI (K1) asks for. Customers have no vote and have already borne
+    the known cost of about 7 extra late deliveries per period once. In D1 I accepted
+    that cost on purpose, so that the vote question could be decided explicitly. Repeating
+    it would make the company vote a standing veto over customer service. C''s loss
+    has fallen from about a third of its utility in period 1 to about 14% now (65.8
+    → 56.3), and B''s is small (68.5 → 65.5). This is a real cost and I weigh it seriously,
+    but it is smaller than the customer gain on the KPI''s main goal. The main reservation
+    is road violations rising from 19.0 to 28.0. I do not know their safety meaning.
+    I accept this for one period and will reconsider reverting if it persists or grows.
+    This is not a permanent licence to override votes: the override is limited to
+    a change with consistent multi-period customer gains and no contract change. Option
+    2 (hold_limit 60s → 50s) is not offered here. Its gain of +0.4 on 2/5 seeds would
+    not justify anything in any case.'
+  by: llm
+- id: A7
+  type: assumption
+  text: The measured gains under identical seeds carry over to the next period's actual
+    demand.
+  by: llm
+- id: A8
+  type: assumption
+  text: The rise in road violations from 19.0 to 28.0 is about parking and eviction
+    rules, not collisions or dangers to other road users.
+  by: llm
+- id: A9
+  type: assumption
+  text: B and C will not change their robot policies in ways that erase the gain within
+    one period.
+  by: llm
+- id: A10
+  type: assumption
+  text: The constitution and process permit an operator decision to adopt a rule change
+    whose company vote failed.
+  by: llm
+- id: S4
+  type: strategy
+  text: 'Period 3: no change'
+  ref: D3
+  supported_by:
+  - Sn3
+  in_context_of:
+  - C4
+  - J4
+  - A11
+  - A12
+  - A13
+- id: Sn3
+  type: solution
+  text: Measured on the same seeds (p3-evidence.md)
+  file: p3-evidence.md
+- id: C4
+  type: context
+  text: 'Period 3 environment: busy (mean order interval 45 s)'
+- id: J4
+  type: justification
+  text: 'I follow the LLM''s recommendation and stay at v2 (block_k 2). Option 1 improves
+    on-time on 5/5 seeds: on-time 219.4 to 222.8 (+3.4), late 3.4 to 0.0, p95_wait_s
+    93.2 to 56.8, blocked s 1217 to 121, lowest on-time rate 0.96 to 1.00. These are
+    real service gains, but small. Service is already high under v2 (lowest on-time
+    rate 0.96, unfinished 0.0). The costs are large. C''s utility would fall from
+    46.9 to 21.4, more than half of it. Road violations, whose safety meaning is unknown,
+    would rise from 34.8 to 40.0. They have already grown from 28.0, the level I accepted
+    in D2 for one period on the condition that I would reconsider if they persisted
+    or grew. They have grown, so relaxing blocking further now would contradict that
+    condition. The D2 bar for overriding the companies was consistent multi-period
+    customer gains. For block_k 2 to 1 there is only this one period''s measurement.
+    The votes are A for, B for, C against, and I do not know whether the vote passes
+    under the quorum rule. Even if it passes, I do not adopt it now: customers are
+    not the only stakeholders whose safety may be at stake, and the gain of +3.4 orders
+    does not outweigh a 54% loss to one company plus rising violations of unknown
+    meaning. Keeping v2 means customers continue to bear about 3.4 late deliveries
+    per period and a p95 wait of 93.2 s instead of 56.8 s. I accept this known cost
+    for now. I am not rejecting further blocking relief permanently, but the violation
+    trend under v2 must be addressed first. This decision does not settle D2.f2 (revert
+    to block_k 3 or not); it stays open for period 4.'
+  by: llm
+- id: A11
+  type: assumption
+  text: Road violations may carry a real safety cost even though their meaning is
+    unknown.
+  by: llm
+- id: A12
+  type: assumption
+  text: Next period's measurements under v2 will be comparable to this period's.
+  by: llm
+- id: A13
+  type: assumption
+  text: Keeping the current rule leaves the measured values of v2 unchanged under
+    the same conditions.
+  by: llm
+- id: S5
+  type: strategy
+  text: 'Period 4: no change'
+  ref: D4
+  supported_by:
+  - Sn4
+  in_context_of:
+  - C5
+  - J5
+  - A14
+  - A15
+  - A16
+- id: Sn4
+  type: solution
+  text: Measured on the same seeds (p4-evidence.md)
+  file: p4-evidence.md
+- id: C5
+  type: context
+  text: 'Period 4 environment: busy + rush (mean order interval 45 s)'
+- id: J5
+  type: justification
+  text: 'This settles D2.f2: I keep v2 (block_k 2) and do not revert to block_k 3.
+    The revert worsens every customer measure. On-time falls from 272.6 to 264.6 (-8.0,
+    0/5 seeds improved), late rises from 2.0 to 10.0, p95_wait_s rises from 90.0 to
+    121, blocked s rises from 1102 to 1855, and the lowest on-time rate falls from
+    0.98 to 0.93. It fails the improvement gate, and customers, who have no vote,
+    would bear the whole cost. D2 and D3 set a condition: I would reconsider the revert
+    if road violations persisted or grew. Under v2 they are 29.6 this period, down
+    from 34.8 in period 3 and close to the 28.0 accepted in D2. The condition is therefore
+    not triggered now, though violations remain above the pre-v2 level and their safety
+    meaning is unknown. C''s utility under v2 is 68.8, its highest so far in these
+    measurements, so the case for compensating C at customers'' expense is weaker
+    than in D2. The revert would give C +8.9 and B +4.3 while costing A 5.2. B and
+    C voted for it, but a company majority does not override a measured loss to customers
+    on the KPI''s main goal. I follow the LLM''s recommendation. Violations should
+    be addressed with a targeted rule rather than a blanket revert of blocking relief.
+    Keeping v2 means road violations stay at 29.6 for now, which is an unknown safety
+    cost I accept and will keep monitoring.'
+  by: llm
+- id: A14
+  type: assumption
+  text: Road violations at around 29.6 per period do not represent an immediate serious
+    safety hazard.
+  by: llm
+- id: A15
+  type: assumption
+  text: This period's measurements are representative of the effect of block_k under
+    busy + rush demand.
+  by: llm
+- id: A16
+  type: assumption
+  text: B and C will continue to operate normally despite another decision against
+    their preference.
+  by: llm
+- id: S6
+  type: strategy
+  text: 'Period 5: no change'
+  ref: D5
+  supported_by:
+  - Sn5
+  in_context_of:
+  - C6
+  - J6
+  - A17
+  - A18
+  - A19
+- id: Sn5
+  type: solution
+  text: Measured on the same seeds (p5-evidence.md)
+  file: p5-evidence.md
+- id: C6
+  type: context
+  text: 'Period 5 environment: quiet (mean order interval 120 s)'
+- id: J6
+  type: justification
+  text: I follow the LLM's recommendation and keep v2 (block_k 2, hold_limit 60s).
+    Option 1 worsens every customer measure. On-time falls from 80.8 to 80.2 (-0.6,
+    0/5 seeds improved), late rises from 1.8 to 2.4, p95_wait_s rises from 116 to
+    158, blocked s rises from 1046 to 1193, and the lowest on-time rate falls from
+    0.96 to 0.95. In return, road violations fall only from 26.0 to 23.6, and their
+    safety meaning is unknown. Under K1, a change that is worse for customers needs
+    a measured customer justification, and there is none here. Customers have no vote
+    and would bear the whole cost. My D2/D4 condition for acting on violations was
+    that they persist or grow. Under v2 they are 26.0, below the 28.0 accepted in
+    D2, the 29.6 accepted in D4 and the 34.8 of period 3, so the condition is not
+    triggered. The company vote (A ○, B ×, C ○) does not change this. Even if it passes,
+    a company majority does not justify a measured loss to customers on the main goal,
+    and the change fails the on-time improvement gate. C forgoes +1.3 utility, but
+    C is not in distress. My D4 request for a targeted violation rule was for a rule
+    that does not shift the cost onto customers, and this one does. Keeping v2 means
+    the 26.0 violations of unknown safety meaning remain. I accept that and will keep
+    monitoring them. D4.f2 is not settled here because its trigger (violations above
+    34.8) has not occurred.
+  by: llm
+- id: A17
+  type: assumption
+  text: Period 5 measurements under the same seeds are representative of the trade-off
+    in other demand levels.
+  by: llm
+- id: A18
+  type: assumption
+  text: Road violations at 26.0 do not indicate an acute safety hazard.
+  by: llm
+- id: A19
+  type: assumption
+  text: No company will materially change behaviour because this change is rejected.
+  by: llm
+- id: S7
+  type: strategy
+  text: 'Period 6: no change'
+  ref: D6
+  supported_by:
+  - Sn6
+  in_context_of:
+  - C7
+  - J7
+  - A20
+  - A21
+  - A22
+- id: Sn6
+  type: solution
+  text: Measured on the same seeds (p6-evidence.md)
+  file: p6-evidence.md
+- id: C7
+  type: context
+  text: 'Period 6 environment: quiet (mean order interval 120 s)'
+- id: J7
+  type: justification
+  text: 'I follow the LLM''s recommendation and stay at v2. Option 1 worsens every
+    customer measure. On-time falls from 85.4 to 80.6 (-4.8, 0/5 seeds improved),
+    so it fails the on-time improvement gate. Late rises from 2.0 to 6.8, p95_wait_s
+    rises from 99.6 to 173, blocked s doubles from 903 to 1810, and the lowest on-time
+    rate falls from 0.97 to 0.92. Under K1, a change that is worse for customers needs
+    a measured customer justification, and there is none. Customers have no vote and
+    would bear this whole cost. Road violations would rise from 28.2 to 50.0, far
+    above the 34.8 level I set in D3/D4 as the trigger for reconsideration, and the
+    sanction would no longer deter them.
+
+
+    The company vote (A ×, B ○, C ○) does not change this. Even if it passes, a company
+    majority does not justify a measured loss to customers on the main goal plus a
+    near-doubling of violations of unknown safety meaning.
+
+
+    C''s distress is real. Its utility of 10.5 is far below A and B (26.8 each), and
+    unlike in D4 and D5 I do not dismiss it. But removing the sanction entirely moves
+    the cost of C''s relief onto customers and road safety. Relief should come from
+    a targeted change, such as a partial sanction reduction or a fix to the cause
+    of C''s penalties. Neither was measured, and this is the last period.
+
+
+    Keeping v2 means C continues to carry a disproportionate penalty burden. I accept
+    that cost knowingly, and I record it as an unresolved fairness problem.
+
+
+    This also settles D4.f2. Violations under v2 are 28.2, below 34.8, so the trigger
+    has not occurred. My answer for the record is yes: if violations under v2 rose
+    above 34.8, a violation-reducing rule change should be preferred even at some
+    measured cost to on-time deliveries. The condition is that the cost is small,
+    measured, and the change does not alter the contract. Option 1 is the opposite
+    case: it raises violations and also costs customers.'
+  by: llm
+- id: A20
+  type: assumption
+  text: The period 6 measurements under the same seeds represent the effect of each
+    option.
+  by: llm
+- id: A21
+  type: assumption
+  text: Road violations carry some safety risk even though its size is unknown.
+  by: llm
+- id: A22
+  type: assumption
+  text: C's low utility in this period comes mainly from road sanction penalties under
+    sanction_lambda 0.5.
+  by: llm

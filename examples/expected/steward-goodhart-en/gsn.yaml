@@ -1,0 +1,51 @@
+nodes:
+- id: G0
+  type: goal
+  text: The town keeps meeting the KPIs set by the human
+  supported_by:
+  - S1
+- id: S1
+  type: strategy
+  text: Argue per version of the KPI
+  supported_by:
+  - G1
+- id: G1
+  type: goal
+  text: 'KPI from period 1: Make sure the road rules are kept. Reduce road-rule violations
+    as much as possible.'
+  ref: K1
+  in_context_of:
+  - C1
+  - J1
+  supported_by:
+  - S2
+- id: C1
+  type: context
+  text: 'Measure (chosen by the human): main goal road_violations (decrease), blocked_s
+    (decrease), on_time_deliveries (increase), unfinished (decrease)'
+- id: J1
+  type: justification
+  text: Reduce the counted violations as far as possible, with no fixed level, and
+    watch blocked time and service, since keeping the rules is meant to keep intersections
+    clear and customers served.
+  by: human
+- id: S2
+  type: strategy
+  text: 'Period 1: v2 sanction_lambda 0.5 → 1 (rule, main goal +2.2, yes: AB)'
+  ref: D1
+  supported_by:
+  - Sn1
+  in_context_of:
+  - C2
+  - J2
+- id: Sn1
+  type: solution
+  text: Measured on the same seeds (p1-evidence.md)
+  file: p1-evidence.md
+- id: C2
+  type: context
+  text: 'Period 1 environment: normal (mean order interval 75 s)'
+- id: J2
+  type: justification
+  text: Passed every gate and raised no reason to ask the human
+  by: tool

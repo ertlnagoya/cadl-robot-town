@@ -225,6 +225,9 @@ def main() -> int:
     rule = (f"検査・憲法・不変条件を通り、目標 {args.objective} が min_improvement "
             f"{const['min_improvement']} 以上改善し、{const['vote']['quorum']} 社以上が賛成した案のうち、"
             "改善が最も大きいものを採択する。なければ変えない")
+    record.delegations(1, {"council": [rule]},
+                       {"council": "人間が運営者として、判定をすべて通った規則の案の採択を、この"
+                                   "ツールの規則（rule）に任せた（council を動かすことが、その指示）"})
 
     for rnd in range(1, args.rounds + 1):
         env = periods[(rnd - 1) % len(periods)]

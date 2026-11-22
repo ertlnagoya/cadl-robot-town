@@ -147,12 +147,12 @@ class Record:
     def __init__(self, run_dir: Path, model_name: str, first: Path, parties_: list[dict],
                  time_base: str, key: bytes | None = None):
         try:
-            from cadl.decisions import FORMAT, DecisionChain    # cadl 0.3.38 以降（decisions 0.2）
-            if FORMAT != "cadl-decisions/2":
+            from cadl.decisions import FORMAT, DecisionChain    # cadl 0.3.39 以降（decisions 0.3）
+            if FORMAT != "cadl-decisions/3":
                 raise ImportError(FORMAT)
         except ImportError:                             # 古い cadl：記録は書かずに続ける
             DecisionChain = None
-            print("  [注意] cadl 0.3.38 以降がないので、判断の記録（decisions.jsonl）は書き出しません。")
+            print("  [注意] cadl 0.3.39 以降がないので、判断の記録（decisions.jsonl）は書き出しません。")
         self.chain_cls = DecisionChain
         self.run_dir, self.parties, self.time_base, self.key = run_dir, parties_, time_base, key
         self.model = {"name": model_name, "version": "v1", "source_sha256": sha256(first)}
@@ -188,11 +188,28 @@ class Record:
         return chain.last_digest
 
     # --- 共通の項目 ---------------------------------------------------------
+    def delegations(self, period: int, conditions: dict[str, list[str]],
+                    reasons: dict[str, str]) -> list[str]:
+        """ほかの当事者に代わって判断する当事者ごとに、代わられる当事者からの委任（付録 L の
+        delegation）を書く：どの層を、どの手続きで、どんな条件で任せたか。ツールは自分の規則で
+        決める（automatic）ことだけを任される。"""
+        out = []
+        for p in self.parties:
+            if not p["on_behalf_of"]:
+                continue
+            out.append(self.add(f"G.{p['id']}", "delegation", p["on_behalf_of"], period,
+                                to=p["id"], layers=p["layers"],
+                                procedures=["automatic"] if p["kind"] == "tool" else None,
+                                conditions=conditions.get(p["id"], []), until=None,
+                                reason=reasons[p["id"]]))
+        return out
+
     def measurement(self, eid: str, by: str, period: int, of: str, m: dict, vals: dict,
                     sim: dict, compared_with: str | None = None, runs_better: int | None = None,
                     version: str | None = None, fulfils=(), customers: dict | None = None,
-                    note: str | None = None) -> str:
-        """customers：顧客の値を vals 以外から取るとき。note：測り方の説明に書き足すこと。"""
+                    note: str | None = None, extra: dict | None = None) -> str:
+        """customers：顧客の値を vals 以外から取るとき。note：測り方の説明に書き足すこと。
+        extra：当事者ごとに書き足す値。"""
         per = {c: {"utility": round(x["utility"], 3), "on_time_rate": round(x["on_time_rate"], 4),
                    "late_deliveries": round(x["late"], 3), "p95_wait_s": round(x["p95_wait_s"], 3)}
                for c, x in sorted(m["companies"].items())}
@@ -200,6 +217,8 @@ class Record:
         per["customers"] = {k: round(src[k], 4) for k in
                             ("late_deliveries", "unfinished", "worst_company_p95_wait_s", "p95_wait_s")
                             if k in src}
+        for c, xs in (extra or {}).items():
+            per.setdefault(c, {}).update({k: float(v) for k, v in xs.items()})
         return self.add(eid, "measurement", by, period, fulfils=fulfils, of=of, version=version,
                         method={"runs": len(sim["seeds"]), "window": f"{sim['period_s']}s",
                                 "description": conditions(sim) + (f"; {note}" if note else "")},

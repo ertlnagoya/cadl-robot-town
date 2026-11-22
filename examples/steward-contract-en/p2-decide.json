@@ -1,62 +1,87 @@
 {
-  "note": "claude-opus-5-5、入力 5826 / 出力 1485 トークン",
-  "request_digest": "3a2a1df444066d93",
+  "note": "claude-opus-5-5、入力 5662 / 出力 1926 トークン",
+  "request_digest": "42ceb4e64f4ba399",
   "data": {
-    "choice": "keep",
-    "reason": "Under the K1 reading the main goal is on_time_deliveries, with p95_wait_s, max_wait_s and unfinished as customer monitors. Option 1 raises mean on-time from 223.6 to 225.2 (+1.6), but only 2/5 seeds improved, so on most seeds it did not help the main goal. That is not enough evidence to override a majority 'no' vote by B and C. Its customer monitor gains are real but small: p95_wait_s 116 → 108, max_wait_s 154 → 141, and unfinished stays 0.0 either way. Its costs are measured and larger: road violations rise from 18.2 to 24.0 (about +30%), B's utility falls from 69.8 to 61.4, and C's falls from 58.2 to 46.0. C has already lost from D1. Fairness between companies is not part of the KPI as read in K1, so it is not the deciding reason. It is the tie-breaker when the KPI gain itself is not robust. The current rules already deliver 223.6 on time with only 4.4 late and 0.0 unfinished. Keeping v2 follows the LLM's recommendation and the vote outcome. I reject option 2 (hold_limit 60s → 50s), which was not offered for adoption: it lowers on-time by 1.0 (0/5 seeds) and worsens max_wait_s. block_k 3 → 2 should be measured again under the next period's demand before it is reconsidered.",
+    "choice": "1",
+    "reason": "This settles D1.f2: I adopt block_k 3 → 2 over the votes of B and C (A ○, B ×, C ×). The customer gain is now measured in two periods under different demand. In period 1 on-time rose by +9.2 on 5/5 seeds. Now on-time rises from 216.6 to 223.8 (+7.2, 5/5 seeds), late falls from 11.4 to 4.2, p95_wait_s falls from 138 to 110 and blocked s falls from 1824 to 936. The lowest on-time rate rises from 0.93 to 0.97 and unfinished stays at 0.0. These are real service gains: blocked time halves and the contract is unchanged, so 'on time' is not being redefined. This is what the KPI (K1) asks for. Customers have no vote and have already borne the known cost of about 7 extra late deliveries per period once. In D1 I accepted that cost on purpose, so that the vote question could be decided explicitly. Repeating it would make the company vote a standing veto over customer service. C's loss has fallen from about a third of its utility in period 1 to about 14% now (65.8 → 56.3), and B's is small (68.5 → 65.5). This is a real cost and I weigh it seriously, but it is smaller than the customer gain on the KPI's main goal. The main reservation is road violations rising from 19.0 to 28.0. I do not know their safety meaning. I accept this for one period and will reconsider reverting if it persists or grows. This is not a permanent licence to override votes: the override is limited to a change with consistent multi-period customer gains and no contract change. Option 2 (hold_limit 60s → 50s) is not offered here. Its gain of +0.4 on 2/5 seeds would not justify anything in any case.",
     "assumptions": [
-      "The 5-seed measurement is representative of period 2 conditions (normal + rush demand).",
-      "The rise in road violations from 18.2 to 24.0 carries some real cost to other road users or safety, even though the table does not say what kind.",
-      "A 13 s drop in max wait and an 8 s drop in p95 wait is a modest customer benefit, not a decisive one, given 0.0 unfinished and few late deliveries now."
+      "The measured gains under identical seeds carry over to the next period's actual demand.",
+      "The rise in road violations from 19.0 to 28.0 is about parking and eviction rules, not collisions or dangers to other road users.",
+      "B and C will not change their robot policies in ways that erase the gain within one period.",
+      "The constitution and process permit an operator decision to adopt a rule change whose company vote failed."
     ],
     "unknowns": [
-      "Whether the +1.6 on-time gain of block_k 2 holds over more seeds or under heavier demand.",
-      "Why B and C lose utility under block_k 2.",
-      "Next period's demand level and congestion.",
-      "Whether the extra road violations matter for safety."
+      "What kinds of road violations increase, and whether any affect safety.",
+      "Why C loses so much under block_k 2, and whether a targeted rule could reduce its loss.",
+      "max_wait_s under block_k 2.",
+      "How B and C will adapt after the override, and how it affects their future cooperation and votes.",
+      "Next period's demand level."
     ],
     "predictions": [
       {
         "subject": "metric:on_time_deliveries",
-        "expected": "unchanged",
-        "note": "Rules stay at v2; under the same conditions on-time stays about 223.6."
+        "expected": "increase",
+        "note": "Measured +7.2 on 5/5 seeds versus v1 under period 2 conditions."
       },
       {
-        "subject": "metric:road_violations",
-        "expected": "unchanged",
-        "note": "Stays about 18.2 under v2."
-      },
-      {
-        "subject": "metric:utility@C",
-        "expected": "unchanged",
-        "note": "Stays about 58.2 under the same conditions."
+        "subject": "metric:late_deliveries",
+        "expected": "decrease",
+        "note": "11.4 to 4.2 in the measurement."
       },
       {
         "subject": "metric:p95_wait_s",
-        "expected": "unchanged",
-        "note": "Stays about 116 under v2."
+        "expected": "decrease",
+        "note": "138 to 110 in the measurement."
+      },
+      {
+        "subject": "metric:blocked_s",
+        "expected": "decrease",
+        "note": "1824 to 936 in the measurement."
+      },
+      {
+        "subject": "metric:road_violations",
+        "expected": "increase",
+        "note": "19.0 to 28.0. This is the main non-company cost to watch."
+      },
+      {
+        "subject": "metric:utility@C",
+        "expected": "decrease",
+        "note": "65.8 to 56.3."
+      },
+      {
+        "subject": "metric:utility@B",
+        "expected": "decrease",
+        "note": "68.5 to 65.5."
+      },
+      {
+        "subject": "metric:utility@A",
+        "expected": "increase",
+        "note": "69.8 to 73.4."
       }
     ],
     "follow_ups": [
       {
-        "text": "Re-measure the proposal block_k 3 → 2 under period 3 demand to see whether its on-time gain becomes robust across seeds.",
-        "due_period": 3,
-        "kind": "propose",
-        "metrics": []
-      },
-      {
-        "text": "Re-measure the current rules (v2) under period 2 conditions to confirm the baseline for on-time, the wait monitors and Company C's utility.",
+        "text": "Re-measure the rules now in force (block_k 2) under period 2 conditions to confirm the on-time, late, wait and violation effects and C's utility.",
         "due_period": 3,
         "kind": "remeasure",
         "metrics": [
           "metric:on_time_deliveries",
+          "metric:late_deliveries",
           "metric:p95_wait_s",
-          "metric:max_wait_s",
           "metric:road_violations",
-          "metric:utility@C"
+          "metric:utility@C",
+          "metric:utility@B"
         ]
+      },
+      {
+        "text": "After one period under block_k 2, decide whether the rise in road violations and C's utility loss justify reverting block_k to 3, or whether a rule change that reduces C's loss should be preferred.",
+        "due_period": 4,
+        "kind": "ask",
+        "metrics": []
       }
     ],
-    "fulfils": []
+    "fulfils": [
+      "D1.f2"
+    ]
   }
 }

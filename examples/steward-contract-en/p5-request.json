@@ -1,0 +1,64 @@
+{
+  "note": "claude-opus-5-5、入力 5742 / 出力 1739 トークン",
+  "request_digest": "b88d2dd5518c1060",
+  "data": {
+    "question": "Should we raise hold_limit from 60s to 70s to cut road violations, even though the measurement shows customers would be served worse, or keep the current rules (v2)?",
+    "background": "This change targets road violations, which you asked for in D3/D4, not the committee's main goal. As expected, it fails the on-time improvement gate: -0.6 on-time, 0/5 seeds improved. Deciding whether a drop in violations of unknown safety meaning justifies more blocked time, longer waits and more late deliveries for customers is a value trade-off, not something the machine judgments can settle. Customers have no vote, and you set the condition on violations, so the decision is yours.",
+    "options": [
+      {
+        "id": "1",
+        "summary": "Adopt hold_limit 60s → 70s. Road violations fall from 26.0 to 23.6. On-time falls from 80.8 to 80.2 (-0.6, 0/5 seeds improved), late rises from 1.8 to 2.4, blocked s rises from 1046 to 1193, and p95_wait_s rises from 116 to 158 (flagged worse). The lowest on-time rate falls from 0.96 to 0.95 and unfinished stays at 0.0. It passes check and the constitution and meets the KPI conditions. Votes are A ○, B ×, C ○, and it fails the on-time improvement gate, so adopting it means overriding that gate.",
+        "stakeholders": "Gains: C (utility 10.2 → 11.5), and road safety in general if fewer violations mean less risk, which is unverified. Losses: customers, who get about 0.6 more late deliveries per period and a p95 wait 42 s longer (116 → 158), with no vote. B loses utility (25.4 → 24.7) and voted against. A loses slightly (25.2 → 25.0)."
+      },
+      {
+        "id": "keep",
+        "summary": "Stay at v2 (block_k 2, hold_limit 60s). On-time stays at 80.8, late at 1.8, p95_wait_s at 116, blocked s at 1046 and lowest on-time rate at 0.96. Road violations stay at 26.0, which is below the 29.6 accepted in D4 and below the 28.0 accepted in D2.",
+        "stakeholders": "Gains: customers keep the current, better service, and B keeps its utility of 25.4. Losses: C forgoes +1.3 utility, and the 26.0 road violations of unknown safety meaning remain."
+      }
+    ],
+    "recommendation": {
+      "id": "keep",
+      "reason": "Option 1 worsens every customer measure: on-time -0.6 on 0/5 seeds, late 1.8 → 2.4, p95_wait_s 116 → 158, blocked s 1046 → 1193. In exchange it reduces violations by only 2.4, and their safety meaning is unknown. Violations under v2 (26.0) are already below the levels you accepted in D2 (28.0) and D4 (29.6), so your reconsideration condition is not triggered. Under K1, a change that is worse for customers needs a measured customer justification, and none exists here. A better approach is a targeted violation rule that does not add blocking, or first establishing what the violations mean for safety.",
+      "assumptions": [
+        "Overstay violations counted by road_violations have no measured safety consequence that would outweigh the customer losses.",
+        "The current period's demand is representative enough that the -0.6 on-time result on 0/5 seeds is not a fluke.",
+        "Keeping v2 reproduces the current-row values under the same seeds."
+      ],
+      "predictions": [
+        {
+          "subject": "metric:on_time_deliveries",
+          "expected": "unchanged",
+          "note": "Stays at 80.8 under v2."
+        },
+        {
+          "subject": "metric:late_deliveries",
+          "expected": "unchanged",
+          "note": "Stays at 1.8."
+        },
+        {
+          "subject": "metric:p95_wait_s",
+          "expected": "unchanged",
+          "note": "Stays at 116."
+        },
+        {
+          "subject": "metric:road_violations",
+          "expected": "unchanged",
+          "note": "Stays at 26.0."
+        },
+        {
+          "subject": "metric:blocked_s",
+          "expected": "unchanged",
+          "note": "Stays at 1046."
+        }
+      ]
+    },
+    "unknowns": [
+      "The real safety meaning of overstay road violations, for example whether they correlate with near-misses or harm.",
+      "Whether a different targeted rule could cut violations without increasing blocked time.",
+      "Each company's operating policy, and whether B or C would change behaviour after this decision.",
+      "How customers perceive a 42 s longer p95 wait compared with fewer violations.",
+      "Next period's demand level and how the trade-off scales with it.",
+      "Whether the vote result (A ○, B ×, C ○) meets the quorum rule."
+    ]
+  }
+}

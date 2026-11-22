@@ -1,0 +1,29 @@
+name: Examples
+
+# Run the examples again (the LLM outputs are replayed, so no API key is needed) and compare the
+# histories, the GSN and the findings of the decision records with examples/expected/.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  examples:
+    # Python 3.9 is not on ubuntu-latest (26.04).
+    runs-on: ${{ matrix.python-version == '3.9' && 'ubuntu-24.04' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install "cadl-lang>=0.3.39" pyyaml
+          cadl --version
+      - name: Run the examples and compare
+        run: python -m town.check_examples

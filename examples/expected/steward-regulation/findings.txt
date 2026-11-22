@@ -1,0 +1,31 @@
+unknowns [K1.d]
+prediction missed [P1.1]
+prediction missed [P1.2]
+prediction missed [P1.2]
+prediction missed [P1.2]
+against recommendation [D1]
+unknowns [D1]
+prediction missed [P2.2]
+prediction missed [P2.2]
+against recommendation [D2]
+unknowns [D2]
+against recommendation [R2]
+unknowns [R2]
+unknowns [D3]
+prediction missed [P4.2]
+prediction missed [P4.2]
+prediction missed [P4.2]
+unknowns [D4]
+unknowns [QR4]
+prediction missed [P5.2]
+prediction missed [P6.2]
+prediction missed [P6.2]
+made within a delegation [K1.d] G.llm-decider
+made within a delegation [D1] G.llm-decider
+made within a delegation [D2] G.llm-decider
+made within a delegation [R2] G.llm-regulator
+made within a delegation [D3] G.llm-decider
+made within a delegation [D4] G.llm-decider
+made within a delegation [QR4] G.llm-regulator
+made within a delegation [D5] G.steward
+made within a delegation [D6] G.steward

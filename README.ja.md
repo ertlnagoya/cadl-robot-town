@@ -28,7 +28,7 @@
 ## セットアップ
 
 コース A のセットアップ（`~/program/cadl_repo` に CADL コンパイラをクローン）が
-済んでいることが前提。CADL コンパイラは 0.3.32 以降を使う（0.3.38 で確かめている。判断の記録の書き出しには 0.3.38 以降が要る）。
+済んでいることが前提。CADL コンパイラは 0.3.32 以降を使う（0.3.39 で確かめている。判断の記録の書き出しには 0.3.39 以降が要る）。
 `cadl --version` で確かめられる。古いコンパイラの IR には切替の安全条件が入らないので、街は規則を却下する。
 手順とインストールの問題への対処は
 [テキストブックの 2.4 節](https://www.ertl.jp/cadl-spec/ja/docs/textbook/toolchain-setup/#24-セットアップ-5-分)にある。
@@ -448,12 +448,12 @@ python -m town.steward --lang en --mode DISTRIBUTED --rounds 6 --name kpi-d-en \
 ### 判断の記録（decisions.jsonl）
 
 `town.steward` と `town.council` は、実行ごとに `runs/<名前>/decisions.jsonl` を書き出す。
-CADL 仕様の[付録 L](https://www.ertl.jp/cadl-spec/ja/docs/spec/appendix-l-decisions)の形式（decisions 0.2）で、
+CADL 仕様の[付録 L](https://www.ertl.jp/cadl-spec/ja/docs/spec/appendix-l-decisions)の形式（decisions 0.3）で、
 誰が何を提案し、何を測り、各社がどう投票し、誰が何を推奨し、誰がどの理由で判断したかを、
 1 行に 1 項目ずつ残す。各行には、付録 G の G.8 と同じハッシュの連鎖が付く。
 
 ```bash
-cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.38 以降
+cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.39 以降
 ```
 
 - 規則の各バージョンは `runs/<名前>/v<n>.cadl` に残し、記録の version の項目に添付する（最初の
@@ -476,11 +476,18 @@ cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.38 以降
   契約の判断の後に、別の判断要求（`R<k>`、`p<k>-reg-request.md`。答えは `answers.yaml` の `R<k>`）で
   規制の担当者に出す。規制の変更は次の期から効く（`constitution-v<n>.yaml` と、モデルの新しいバージョン）。記録では、
   判断する当事者が判断してよい層（`layers`）を持つ。判定をすべて通った規則の変更を自分で採択する
-  steward（と council）は、運営者に代わって（`on_behalf_of`）`["rule"]` について判断する。そのため
-  検証器は、その判断に指摘 delegated を出す。
+  steward（と council）は、運営者に代わって（`on_behalf_of`）`["rule"]` について判断する。
+- 誰が誰に判断を任せたか：記録の初めに、運営者は自分に代わって判断する当事者ごとに委任を書く
+  （`delegation` の項目 `G.<当事者>`、decisions 0.3）。steward と council には、自分の規則で決める
+  こと（`procedures: ["automatic"]`）だけを規則の層について任せ、その規則と判定を `conditions` に
+  書く。`--decider llm` では、`--delegate` で与えた層を LLM に任せる。規制の担当者も同じく
+  `llm-regulator` に任せる。ツールを動かすこと、`--delegate` を与えることが、人間のその指示である。
+  検証器は、委任の範囲で行った判断をその委任のもとに示し、範囲の外の判断にだけ指摘 delegated を出す。
 - 規制の案は、判断の前に測る。steward は、案の値を、その期に測った現行の規則と案、その投票に
-  当てはめ（新しい実行はしない）、不変条件を満たす案と投票を通る案の数と、現行の規則での各社と
-  顧客の値を記録する（`P<k>.R<i>.m`）。
+  当てはめ（新しい実行はしない）、不変条件を満たす案と投票を通る案の数を、その期について、また記録の
+  それまでの期に測ったすべての案について（`…_all`）記録する。会社ごとには、その会社が反対したのに
+  投票を通る案の数（`passing_against`）を記録し、現行の規則での各社と顧客の値とともに残す
+  （`P<k>.R<i>.m`）。
 - 約束は、何がそれを果たすかを持ち、街の中の誰かが行うことだけを約束する。答えの `follow_ups` の
   項目は、`text`、`due`（期）、`kind` を持つ。
   - `remeasure`（`metrics` も。例 `utility@C`、`road_violations`）：steward が、次の期の初めに、
@@ -488,7 +495,11 @@ cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.38 以降
     記録する。この測定が約束を果たす（`remeasure: true` もこの種類として読む）。
   - `propose`：改正案を測る約束。改正案を出す LLM が後の期にまだ果たされていない約束を読み、それを
     実行する案が `fulfils` で挙げると果たされる。
-  - `ask`（既定）：後の判断で決める問い。後の判断が `fulfils` で挙げると果たされる。
+  - `ask`（既定）：後の判断で決める問い。後の判断が `fulfils` で挙げると果たされる。期限の期が
+    来ても決まっていなければ、steward はそれを約束した側の判断する者に、別の判断要求で渡す
+    （運営者は `Q<k>`、規制の担当者は `QR<k>`。`p<k>-ask.md`。答えは `answers.yaml` の `Q<k>` に、
+    `keep` と理由で書く）。最後の期には、残った問いをすべて渡す。最後の期の判断要求には、その期に
+    した約束は果たされないと書く。
   種類の違う約束を判断が `fulfils` で挙げても約束は果たされず、検証器は fulfilment not shown を報告する。
 - `--decider llm` では、`--delegate` で与えた層（既定は `rule,contract`。`rule` と `contract` は同じ
   判断要求で扱うので、両方を任せるか、どちらも任せない）について、人間に代わって LLM が判断要求に
@@ -496,13 +507,21 @@ cadl decisions-verify runs/<名前>/decisions.jsonl     # cadl 0.3.38 以降
   規制の担当者に代わるときは `llm-regulator`（`llm/p<k>-reg-decide.json`）として記録される。任せない
   層の判断要求は人間に出す。LLM は、まだ果たされていない約束を読み、判断で決める問いを `fulfils` に
   挙げ、自分の約束に種類（`remeasure`、`propose`、`ask`）を付ける。街の中で誰も行わない調べものは
-  約束せず、まだ果たされていない約束を出し直さないよう指示している。検証器は、LLM の判断ごとに
-  指摘 delegated を出す。
+  約束せず、まだ果たされていない約束を出し直さないよう指示している。LLM の判断は、委任
+  `G.llm-decider`（または `G.llm-regulator`）のもとの判断になる。
 - `--layers rule,contract` で、改正案を規則と契約の層に限る（規制の案は測らずに除く）。
-- 見本（Claude Opus 5.5 が人間に代わって判断した、2026-11-21 の記録）：`examples/steward-contract/`
+- 見本（Claude Opus 5.5 が人間に代わって判断した、2026-11-22 の記録）：`examples/steward-contract/`
   （日本語）と `examples/steward-contract-en/`（英語）は、契約（約束の時間）の見直しを許す KPI での
   6 期（`--layers rule,contract`）。`examples/steward-regulation/` と `examples/steward-regulation-en/`
   は、規制の見直しを許す KPI での 6 期（`--delegate rule,contract,regulation`）。
+
+## 見本を確かめる
+
+`python -m town.check_examples` は、すべての見本を、記録した LLM の出力を再生してもう一度実行し
+（API キーは要らない）、改正の履歴、GSN、判断の記録の指摘を `examples/expected/<名前>/` と比べる。
+記録が検証でエラーにならないことと、LLM への依頼が記録したときと同じであることも確かめる。
+`--update` で今の結果をそこに書く。GitHub Actions は、PR と main への push のたびに、Python 3.9 と
+3.14 でこれを実行する。
 
 ## 制約と、まだないもの
 
