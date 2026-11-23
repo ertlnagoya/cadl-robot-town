@@ -312,7 +312,8 @@ cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.39 or later
   A decision that names a promise of another kind does not fulfil it, and the verifier reports
   `fulfilment not shown`.
 - After a decision adopts an amendment, the steward measures the adopted proposal and the rules
-  it replaces under the seeds and demand of the next period, which the decision did not use
+  it replaces under the seeds and demand of the next period of the scenario (after its last
+  period, its first), which the decision did not use
   (`D<k>.n` of the proposal, compared with `D<k>.n0` of the rules in force). The verifier then
   checks the predictions of the decision, its recommendation and the proposal against a
   measurement that played no part in the choice, and reports `prediction missed` when the
