@@ -1009,6 +1009,7 @@ def main() -> int:
 
         # 5. 採択と記録
         what = M("keep")
+        ir_before = ir
         if chosen is not None and chosen.kind == "amend":
             text, ir = chosen.text, compile_rules(run_dir / f"p{k}-{chosen.cid}.cadl")
             version += 1
@@ -1084,6 +1085,23 @@ def main() -> int:
                        **dr.evidence(what if chosen is not None else None))
         if chosen is not None and chosen.kind == "amend":
             record.version(version, "steward", k, k + 1, run_dir / f"v{version}.cadl", f"D{k}")
+            # 採択した案を、次の期の条件（シードと需要）で、いまの規則と並べて測る。判断で使わなかった
+            # 条件で、判断（と推奨、案）の予測を後の測定が確かめられるように（付録 L、prediction missed）
+            nxt = periods[k % len(periods)]
+            nsim = dict(sim, seeds=[s + nxt["seed_offset"] for s in const["seeds"]],
+                        order_interval_s=nxt["order_interval_s"], rush=nxt.get("rush"))
+            b0, b1 = evaluate(ir_before, **nsim), evaluate(ir, **nsim)
+            v0, v1 = kpi.measure(b0), kpi.measure(b1)
+            a0 = record.measurement(f"D{k}.n0", "steward", k, "in_force", b0, v0, nsim,
+                                    version=f"v{v_before}", note=M("dr_next_method", k=k + 1))
+            record.measurement(f"D{k}.n", "steward", k, pid(chosen.cid), b1, v1, nsim, compared_with=a0,
+                               runs_better=sum(kpi.gain(spec, kpi.measure(r0), kpi.measure(r1)) > 0
+                                               for r0, r1 in zip(b0["runs"], b1["runs"])),
+                               note=M("dr_next_method", k=k + 1))
+            values = M("comma").join(f"{n} {kpi.fmt(n, v0[n])} → {kpi.fmt(n, v1[n])}"
+                                     for n in dict.fromkeys(g["metric"] for g in spec["goals"]) if n in v0 and n in v1)
+            print(M("next_check", k=k + 1, v0=v_before, v=version, values=values))
+            md.append(M("md_next_check", k=k + 1, v0=v_before, v=version, values=values))
         log.append({"id": f"D{k}", "period": k, "who": who, "summary": what,
                     "reason": (ans or {}).get("reason", "")})
 

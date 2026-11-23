@@ -311,6 +311,14 @@ cadl decisions-verify runs/<name>/decisions.jsonl     # cadl 0.3.39 or later
     period say that no promise made then can be kept.
   A decision that names a promise of another kind does not fulfil it, and the verifier reports
   `fulfilment not shown`.
+- After a decision adopts an amendment, the steward measures the adopted proposal and the rules
+  it replaces under the seeds and demand of the next period, which the decision did not use
+  (`D<k>.n` of the proposal, compared with `D<k>.n0` of the rules in force). The verifier then
+  checks the predictions of the decision, its recommendation and the proposal against a
+  measurement that played no part in the choice, and reports `prediction missed` when the
+  adopted change does not hold up. `cadl decisions-verify` (0.3.41 or later) counts the
+  predictions it checked and why it could not check the others (about `keep`, or about an
+  option that was not adopted, which nobody measures again).
 - With `--decider llm`, the LLM answers the decision requests in place of the human for the
   layers given with `--delegate` (default `rule,contract`; `rule` and `contract` go together,
   since they are decided in one request). It acts for the operator as `llm-decider`
