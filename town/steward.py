@@ -1093,15 +1093,15 @@ def main() -> int:
             b0, b1 = evaluate(ir_before, **nsim), evaluate(ir, **nsim)
             v0, v1 = kpi.measure(b0), kpi.measure(b1)
             a0 = record.measurement(f"D{k}.n0", "steward", k, "in_force", b0, v0, nsim,
-                                    version=f"v{v_before}", note=M("dr_next_method", k=k + 1))
+                                    version=f"v{v_before}", note=M("dr_next_method", n=k % len(periods) + 1, label=label(nxt)))
             record.measurement(f"D{k}.n", "steward", k, pid(chosen.cid), b1, v1, nsim, compared_with=a0,
                                runs_better=sum(kpi.gain(spec, kpi.measure(r0), kpi.measure(r1)) > 0
                                                for r0, r1 in zip(b0["runs"], b1["runs"])),
-                               note=M("dr_next_method", k=k + 1))
+                               note=M("dr_next_method", n=k % len(periods) + 1, label=label(nxt)))
             values = M("comma").join(f"{n} {kpi.fmt(n, v0[n])} → {kpi.fmt(n, v1[n])}"
                                      for n in dict.fromkeys(g["metric"] for g in spec["goals"]) if n in v0 and n in v1)
-            print(M("next_check", k=k + 1, v0=v_before, v=version, values=values))
-            md.append(M("md_next_check", k=k + 1, v0=v_before, v=version, values=values))
+            print(M("next_check", n=k % len(periods) + 1, label=label(nxt), v0=v_before, v=version, values=values))
+            md.append(M("md_next_check", n=k % len(periods) + 1, label=label(nxt), v0=v_before, v=version, values=values))
         log.append({"id": f"D{k}", "period": k, "who": who, "summary": what,
                     "reason": (ans or {}).get("reason", "")})
 
